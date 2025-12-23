@@ -1,0 +1,2144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Management System - Embyte Print Shop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .sidebar-icon {
+            width: 20px;
+            text-align: center;
+        }
+        .main-content {
+            display: none;
+        }
+        .main-content.active {
+            display: block;
+        }
+        .modal {
+            display: none;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .kanban-column {
+            min-width: 280px;
+        }
+        /* Notification Style */
+        #notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        #notification.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .input-error {
+            border-color: #EF4444 !important;
+        }
+        .error-message {
+            color: #EF4444;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-gray-800 text-white flex flex-col">
+            <div class="p-6 text-2xl font-bold border-b border-gray-700">
+                Embyte Print Shop
+            </div>
+            <nav id="sidebar-nav" class="flex-1 p-4 space-y-2">
+                <a href="#dashboard" data-roles="admin,vendedor,designer" class="nav-link flex items-center px-4 py-2.5 rounded-lg hover:bg-gray-700 active-link bg-gray-700">
+                    <i class="fas fa-tachometer-alt sidebar-icon mr-3"></i> Dashboard
+                </a>
+                <a href="#orcamentos" data-roles="admin,vendedor" class="nav-link flex items-center px-4 py-2.5 rounded-lg hover:bg-gray-700">
+                    <i class="fas fa-calculator sidebar-icon mr-3"></i> Quotes
+                </a>
+                <a href="#pedidos" data-roles="admin,vendedor,designer" class="nav-link flex items-center px-4 py-2.5 rounded-lg hover:bg-gray-700">
+                    <i class="fas fa-box-open sidebar-icon mr-3"></i> Orders
+                </a>
+                <a href="#estoque" data-roles="admin" class="nav-link flex items-center px-4 py-2.5 rounded-lg hover:bg-gray-700">
+                    <i class="fas fa-warehouse sidebar-icon mr-3"></i> Inventory
+                </a>
+                <a href="#financeiro" data-roles="admin" class="nav-link flex items-center px-4 py-2.5 rounded-lg hover:bg-gray-700">
+                    <i class="fas fa-file-invoice-dollar sidebar-icon mr-3"></i> Finance
+                </a>
+                <a href="#clientes" data-roles="admin,vendedor" class="nav-link flex items-center px-4 py-2.5 rounded-lg hover:bg-gray-700">
+                    <i class="fas fa-users sidebar-icon mr-3"></i> Clients
+                </a>
+                <a href="#fornecedores" data-roles="admin" class="nav-link flex items-center px-4 py-2.5 rounded-lg hover:bg-gray-700">
+                    <i class="fas fa-truck sidebar-icon mr-3"></i> Suppliers
+                </a>
+                 <a href="#precificar" data-roles="admin" class="nav-link flex items-center px-4 py-2.5 rounded-lg hover:bg-gray-700">
+                    <i class="fas fa-hand-holding-usd sidebar-icon mr-3"></i> Pricing
+                </a>
+                <a href="#prejuizos" data-roles="admin" class="nav-link flex items-center px-4 py-2.5 rounded-lg hover:bg-gray-700">
+                    <i class="fas fa-exclamation-triangle sidebar-icon mr-3"></i> Losses
+                </a>
+                <a href="#relatorios" data-roles="admin,vendedor" class="nav-link flex items-center px-4 py-2.5 rounded-lg hover:bg-gray-700">
+                    <i class="fas fa-chart-line sidebar-icon mr-3"></i> Reports
+                </a>
+            </nav>
+            <div id="user-profile-section" class="p-4 border-t border-gray-700">
+                <!-- User profile / Login button here -->
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-8 overflow-y-auto">
+            <!-- Content is rendered by JS based on login state -->
+        </main>
+    </div>
+
+    <!-- Modal Orçamento -->
+    <div id="modal-orcamento" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-10">
+        <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-5xl max-h-[90vh] flex flex-col">
+            <h2 class="text-2xl font-bold mb-6">Create New Quote</h2>
+            <form id="form-orcamento" class="flex-grow overflow-y-auto pr-4">
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block mb-1 font-semibold">Client</label>
+                            <select id="orcamento-cliente" class="w-full p-2 border rounded-md"></select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                             <div>
+                                <label class="block mb-1 font-semibold">Delivery Date</label>
+                                <input id="orcamento-entrega-data" type="date" class="w-full p-2 border rounded-md">
+                            </div>
+                            <div>
+                                <label class="block mb-1 font-semibold">Delivery Time</label>
+                                <input id="orcamento-entrega-hora" type="time" class="w-full p-2 border rounded-md">
+                            </div>
+                        </div>
+                    </div>
+                     <div>
+                        <label class="block mb-1 font-semibold">General Quote Notes</label>
+                        <input id="orcamento-obs" type="text" class="w-full p-2 border rounded-md" placeholder="E.g.: Art sent by the client, urgent delivery...">
+                    </div>
+                    <div id="orcamento-itens-container" class="space-y-6 border-t border-b py-6">
+                        <!-- Item rows will be injected here by JS -->
+                    </div>
+                    <button type="button" id="add-orcamento-item-btn" class="text-sm text-blue-600 hover:text-blue-800 font-semibold"><i class="fas fa-plus mr-2"></i>Add Item to Quote</button>
+                </div>
+            </form>
+             <div class="mt-6 border-t pt-4 flex justify-end items-center">
+                <p class="text-xl font-bold">Quote Total: <span id="preco-calculado" class="text-blue-600">$ 0.00</span></p>
+            </div>
+            <div class="flex justify-end space-x-4 mt-8">
+                <button type="button" class="modal-close-btn px-6 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 font-semibold">Cancel</button>
+                <button type="submit" form="form-orcamento" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">Save Quote</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Genérico para Forms -->
+    <div id="modal-generico" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-20">
+        <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="modal-generico-title" class="text-2xl font-bold"></h2>
+                <button class="modal-close-btn text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+            </div>
+            <div id="modal-generico-content">
+                <!-- Form content will be injected here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification Element -->
+    <div id="notification"></div>
+
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        let currentUser = null; // Logged-in user simulation
+        let selectedMonth = new Date().toISOString().slice(0, 7); // e.g., "2025-09"
+        let faturamentoChart = null; // Chart variable
+
+        // --- MOCK DATA (Database simulation) ---
+        let db = {
+            users: [
+                { id: 1, nome: "Admin", email: "admin@embyte.com", password: "123", role: "admin" },
+                { id: 2, nome: "Sales", email: "vendedor@embyte.com", password: "123", role: "vendedor" },
+                { id: 3, nome: "Designer", email: "designer@embyte.com", password: "123", role: "designer" }
+            ],
+            clientes: [
+                { id: 1, nome: "Ana Silva", empresa: "Tech Solutions", email: "ana.silva@email.com", telefone: "(11) 98765-4321", cpf: "123.456.789-10", totalGasto: 4500.00 },
+                { id: 2, nome: "Bruno Costa", empresa: "Mercado Central", email: "bruno.costa@email.com", telefone: "(21) 91234-5678", cpf: "111.222.333-44", totalGasto: 8900.50 },
+                { id: 3, nome: "Carla Dias", empresa: "Advocacia Dias", email: "", telefone: "(31) 95555-4444", cpf: "987.654.321-00", totalGasto: 1200.00 },
+            ],
+            fornecedores: [
+                { id: 1, nome: "Papelaria Central", contato: "Sr. João", telefone: "(11) 5555-1234", email: "contato@papelariacentral.com", cnpj: "12.345.678/0001-99", endereco: "Rua das Flores, 123" },
+                { id: 2, nome: "Tintas ABC", contato: "Sra. Maria", telefone: "(21) 9999-8765", email: "vendas@tintasabc.com", cnpj: "98.765.432/0001-11", endereco: "Av. Principal, 456" },
+            ],
+            orcamentos: [
+                { 
+                    id: 1, clienteId: 2, data: "2025-09-20", valor: 135.75, status: "Aprovado", obs: "Cliente com pressa", entregaData: "2025-09-28", entregaHora: "17:00",
+                    itens: [
+                        { produto: "Business Card", price: 135.75, papelId: 1, corId: 1, acabamentoId: 2, quantidade: 1000, itemWidth: 9.3, itemHeight: 5.7, margem: 0.5 }
+                    ]
+                },
+                { 
+                    id: 2, clienteId: 1, data: "2025-09-22", valor: 128.80, status: "Pendente", obs: "", entregaData: "", entregaHora: "",
+                    itens: [
+                         { produto: "Flyer A5", price: 128.80, papelId: 2, corId: 3, acabamentoId: 1, quantidade: 500, itemWidth: 14.8, itemHeight: 21, margem: 0.5 }
+                    ]
+                },
+            ],
+            pedidos: [
+                { id: 202501, orcamentoId: 1, clienteId: 2, data: "2025-09-21", valor: 135.75, status: "In Production", produto: "Business Card" },
+            ],
+            prejuizos: [
+                 { id: 1, data: "2025-09-22", tipo: "item", valor: 1, quantidade: 10, comentario: "Sheets crumpled during transport." },
+                 { id: 2, data: "2025-09-23", tipo: "valor", valor: 50.00, quantidade: null, comentario: "Printing error, ink loss." }
+            ],
+            standardProducts: [
+                { id: 1, name: "Standard Business Card", widthCM: 9.3, heightCM: 5.7 },
+                { id: 2, name: "Flyer A5", widthCM: 14.8, heightCM: 21 },
+                { id: 3, name: "Clothing Tag", widthCM: 5, heightCM: 9 },
+            ],
+            itensVendaRapida: [
+                { id: 1, name: 'Photocopy B&W', price: 0.50 },
+                { id: 2, name: 'Photocopy Color', price: 1.00 },
+                { id: 3, name: 'Blue Pen', price: 2.50 },
+            ],
+            categoriasEstoque: [
+                { id: 1, nome: "Paper" },
+                { id: 2, nome: "Ink" },
+                { id: 3, nome: "Finishing Supply" },
+            ],
+            estoque: [
+                { id: 1, item: "Couchê 300g (Sheet 66x96)", categoriaId: 1, unidade: "Sheet", fornecedorId: 1, precoCusto: 0.75, qtdAtual: 850, qtdMinima: 1000, widthCM: 66, heightCM: 96 },
+                { id: 2, item: "Offset 90g (Sheet 66x96)", categoriaId: 1, unidade: "Sheet", fornecedorId: 1, precoCusto: 0.30, qtdAtual: 3500, qtdMinima: 2000, widthCM: 66, heightCM: 96 },
+                { id: 3, item: "Vinyl Sticker (m²)", categoriaId: 1, unidade: "m²", fornecedorId: 2, precoCusto: 15.00, qtdAtual: 50, qtdMinima: 20, widthCM: 100, heightCM: 100 },
+            ],
+            acabamentos: [
+                { id: 1, nome: "None", custoPorMilheiro: 0 },
+                { id: 2, nome: "Full Front Varnish", custoPorMilheiro: 20.00 },
+                { id: 3, nome: "Matte Lamination", custoPorMilheiro: 35.00 },
+                { id: 4, nome: "Special Cut", custoPorMilheiro: 50.00 }
+            ],
+            cores: [
+                { id: 1, nome: "4x4 (Full Color Front & Back)", custoClique: 0.18, lados: 2 },
+                { id: 2, nome: "4x1 (Full Color Front, B&W Back)", custoClique: 0.12, lados: 2 },
+                { id: 3, nome: "4x0 (Full Color Front)", custoClique: 0.18, lados: 1 },
+                { id: 4, nome: "1x0 (B&W)", custoClique: 0.05, lados: 1 }
+            ],
+            producao: [
+                 { op: 101, pedidoId: 202501, produto: "Business Card", setor: "Printing"},
+            ],
+            financeiro: {
+                receber: [ 
+                    { id: 1, clienteId: 2, vencimento: "2025-09-30", valor: 750.00, pago: true, quoteId: null },
+                    { id: 2, clienteId: 1, vencimento: "2025-10-10", valor: 1200.50, pago: false, quoteId: null },
+                    { id: 3, clienteId: 3, vencimento: "2025-10-15", valor: 350.00, pago: false, quoteId: null }
+                ],
+                pagar: [ 
+                    { id: 1, fornecedorId: 1, vencimento: "2025-09-28", valor: 1800.00, pago: true },
+                    { id: 2, fornecedorId: null, description: "Electricity Bill", vencimento: "2025-10-05", valor: 850.00, pago: false },
+                    { id: 3, fornecedorId: null, description: "Rent", vencimento: "2025-10-10", valor: 2500.00, pago: false }
+                ]
+            }
+        };
+        
+        const companyData = {
+            nome: "62.975.345 EMANUEL SILVA BEZERRA CANTANHEDE",
+            cnpj: "62.975.245/0001-91",
+            telefone: "(98) 98408-2399",
+            endereco: "Rua do Comércio n92, Centro, Conceição do Lago Açu, CEP 65340-000"
+        };
+
+        // --- MAIN AREA TEMPLATE ---
+        const mainHTMLTemplate = `
+            <div id="dashboard" class="main-content">
+                <h1 class="text-3xl font-bold mb-6">Dashboard</h1>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-lg font-semibold text-gray-500">Orders in Production</h3><p id="dashboard-pedidos" class="text-4xl font-bold mt-2">0</p></div>
+                    <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-lg font-semibold text-gray-500">Pending Quotes</h3><p id="dashboard-orcamentos" class="text-4xl font-bold mt-2">0</p></div>
+                    <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-lg font-semibold text-gray-500">Receivables (Current Month)</h3><p id="dashboard-receber" class="text-4xl font-bold mt-2">$ 0.0k</p></div>
+                    <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-lg font-semibold text-red-500">Low Stock Items</h3><p id="dashboard-estoque" class="text-4xl font-bold mt-2 text-red-600">0</p></div>
+                </div>
+                <div class="mt-8 bg-white p-6 rounded-lg shadow">
+                    <h2 class="text-xl font-bold mb-4">Recent Orders Tracking</h2>
+                    <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="py-2 px-4">Order #</th><th class="py-2 px-4">Client</th><th class="py-2 px-4">Value</th><th class="py-2 px-4">Status</th></tr></thead><tbody id="dashboard-tabela-pedidos"></tbody></table></div>
+                </div>
+            </div>
+            <div id="orcamentos" class="main-content">
+                <div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-bold">Quotes</h1><button data-roles="admin,vendedor" id="novo-orcamento-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 shadow font-semibold"><i class="fas fa-plus mr-2"></i> New Quote</button></div>
+                <div class="bg-white p-6 rounded-lg shadow"><table class="w-full text-left"><thead><tr class="border-b"><th class="py-2 px-4">#</th><th class="py-2 px-4">Client</th><th class="py-2 px-4">Date</th><th class="py-2 px-4">Total Value</th><th class="py-2 px-4">Status</th><th class="py-2 px-4">Actions</th></tr></thead><tbody id="tabela-orcamentos"></tbody></table></div>
+            </div>
+            <div id="pedidos" class="main-content">
+                <h1 class="text-3xl font-bold mb-6">Order Tracking</h1>
+                <div class="bg-white p-6 rounded-lg shadow">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead><tr class="border-b"><th class="py-2 px-4">Order #</th><th class="py-2 px-4">Client</th><th class="py-2 px-4">Product</th><th class="py-2 px-4">Value</th><th class="py-2 px-4">General Status</th><th class="py-2 px-4">Production Sector</th><th class="py-2 px-4">Actions</th></tr></thead>
+                            <tbody id="tabela-pedidos"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div id="estoque" class="main-content">
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-3xl font-bold">Inventory Control</h1>
+                    <div class="flex space-x-2" data-roles="admin">
+                         <button data-action="manage-categories" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 shadow font-semibold"><i class="fas fa-tags mr-2"></i> Manage Categories</button>
+                         <button data-action="add-stock-item" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow font-semibold"><i class="fas fa-plus mr-2"></i> Add Item</button>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow"><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="py-2 px-4">Item</th><th class="py-2 px-4">Category</th><th class="py-2 px-4">Cost / Unit</th><th class="py-2 px-4">Current Qty</th><th class="py-2 px-4">Min. Qty</th><th class="py-2 px-4">Status</th><th class="py-2 px-4">Actions</th></tr></thead><tbody id="tabela-estoque"></tbody></table></div></div>
+            </div>
+            <div id="financeiro" class="main-content">
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-3xl font-bold">Finance</h1>
+                    <div>
+                        <label for="month-filter" class="mr-2 text-sm font-semibold">Reference Month:</label>
+                        <input type="month" id="month-filter" class="p-2 border rounded-md">
+                    </div>
+                </div>
+                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-lg font-semibold text-gray-500">Total Received</h3><p id="financeiro-recebido" class="text-3xl font-bold mt-2 text-green-600">$ 0.00</p></div>
+                    <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-lg font-semibold text-gray-500">Receivables</h3><p id="financeiro-a-receber" class="text-3xl font-bold mt-2 text-yellow-600">$ 0.00</p></div>
+                    <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-lg font-semibold text-gray-500">Total Paid</h3><p id="financeiro-pago" class="text-3xl font-bold mt-2 text-red-600">$ 0.00</p></div>
+                    <div class="bg-white p-6 rounded-lg shadow"><h3 class="text-lg font-semibold text-gray-500">Payables</h3><p id="financeiro-a-pagar" class="text-3xl font-bold mt-2 text-orange-600">$ 0.00</p></div>
+                </div>
+                 <div class="bg-white p-6 rounded-lg shadow mb-8">
+                    <h2 class="text-xl font-bold text-orange-600 mb-4">Quotes Awaiting Payment</h2>
+                    <table class="w-full text-left text-sm">
+                        <thead>
+                            <tr class="border-b">
+                                <th class="py-2 px-1">#</th>
+                                <th class="py-2 px-1">Client</th>
+                                <th class="py-2 px-1">Date</th>
+                                <th class="py-2 px-1">Total Value</th>
+                                <th class="py-2 px-1">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-aguardando-pagamento"></tbody>
+                    </table>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold text-green-600">Accounts Receivable</h2>
+                            <button data-action="add-receivable" data-roles="admin" class="bg-green-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-green-600 font-semibold"><i class="fas fa-plus"></i> Add</button>
+                        </div>
+                        <table class="w-full text-left text-sm"><thead><tr class="border-b"><th class="py-2 px-1">Client</th><th class="py-2 px-1">Due Date</th><th class="py-2 px-1">Value</th><th class="py-2 px-1">Actions</th></tr></thead><tbody id="tabela-receber"></tbody></table>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold text-red-600">Accounts Payable</h2>
+                            <button data-action="add-payable" data-roles="admin" class="bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-600 font-semibold"><i class="fas fa-plus"></i> Add</button>
+                        </div>
+                        <table class="w-full text-left text-sm"><thead><tr class="border-b"><th class="py-2 px-1">Supplier</th><th class="py-2 px-1">Due Date</th><th class="py-2 px-1">Value</th><th class="py-2 px-1">Actions</th></tr></thead><tbody id="tabela-pagar"></tbody></table>
+                    </div>
+                </div>
+                <div class="mt-8 bg-white p-6 rounded-lg shadow"><h2 class="text-xl font-bold mb-4">Monthly Cash Flow (Realized)</h2><div id="fluxo-caixa-content"></div></div>
+            </div>
+            <div id="clientes" class="main-content">
+                <div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-bold">Client Registration</h1><button id="novo-cliente-btn" data-roles="admin,vendedor" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 shadow font-semibold"><i class="fas fa-user-plus mr-2"></i> New Client</button></div>
+                <div class="bg-white p-6 rounded-lg shadow"><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="py-2 px-4">Name</th><th class="py-2 px-4">ID (CPF)</th><th class="py-2 px-4">Phone</th><th class="py-2 px-4">Email</th><th class="py-2 px-4">Actions</th></tr></thead><tbody id="tabela-clientes"></tbody></table></div></div>
+            </div>
+            <div id="fornecedores" class="main-content">
+                <div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-bold">Supplier Registration</h1><button id="novo-fornecedor-btn" data-roles="admin" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 shadow font-semibold"><i class="fas fa-plus mr-2"></i> New Supplier</button></div>
+                <div class="bg-white p-6 rounded-lg shadow"><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="py-2 px-4">Name</th><th class="py-2 px-4">Contact</th><th class="py-2 px-4">Phone</th><th class="py-2 px-4">Email</th><th class="py-2 px-4">Actions</th></tr></thead><tbody id="tabela-fornecedores"></tbody></table></div></div>
+            </div>
+             <div id="precificar" class="main-content">
+                <h1 class="text-3xl font-bold mb-6">Pricing Settings</h1>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                     <!-- Tabela de Produtos Padrão -->
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold">Standard Products (Quoting)</h2>
+                            <button data-action="add-standard-product" data-roles="admin" class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-600 font-semibold"><i class="fas fa-plus"></i> Add</button>
+                        </div>
+                        <table class="w-full text-left text-sm">
+                            <thead><tr class="border-b"><th class="py-2 px-1">Name</th><th class="py-2 px-1">Dimensions (WxH cm)</th><th class="py-2 px-1">Actions</th></tr></thead>
+                            <tbody id="tabela-produtos-padrao"></tbody>
+                        </table>
+                    </div>
+                    <!-- Tabela de Cores -->
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold">Printing Costs (Colors)</h2>
+                            <button data-action="add-color" data-roles="admin" class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-600 font-semibold"><i class="fas fa-plus"></i> Add</button>
+                        </div>
+                        <table class="w-full text-left text-sm">
+                            <thead><tr class="border-b"><th class="py-2 px-1">Description</th><th class="py-2 px-1">Cost / Click</th><th class="py-2 px-1">Sides</th><th class="py-2 px-1">Actions</th></tr></thead>
+                            <tbody id="tabela-cores"></tbody>
+                        </table>
+                    </div>
+                    <!-- Tabela de Acabamentos -->
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold">Finishing Costs</h2>
+                            <button data-action="add-finishing" data-roles="admin" class="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-600 font-semibold"><i class="fas fa-plus"></i> Add</button>
+                        </div>
+                        <table class="w-full text-left text-sm">
+                            <thead><tr class="border-b"><th class="py-2 px-1">Description</th><th class="py-2 px-1">Cost / Thousand</th><th class="py-2 px-1">Actions</th></tr></thead>
+                            <tbody id="tabela-acabamentos"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+             <div id="prejuizos" class="main-content">
+                <div class="flex justify-between items-center mb-6"><h1 class="text-3xl font-bold">Loss & Damage Log</h1><button id="novo-prejuizo-btn" data-roles="admin" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 shadow font-semibold"><i class="fas fa-plus mr-2"></i> Log New Loss</button></div>
+                <div class="bg-white p-6 rounded-lg shadow"><div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="border-b"><th class="py-2 px-4">Date</th><th class="py-2 px-4">Type</th><th class="py-2 px-4">Details</th><th class="py-2 px-4">Comment</th></tr></thead><tbody id="tabela-prejuizos"></tbody></table></div></div>
+            </div>
+            <div id="relatorios" class="main-content">
+                <h1 class="text-3xl font-bold mb-6">Reports & Analytics</h1>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Relatório de Faturamento -->
+                    <div class="bg-white p-6 rounded-lg shadow col-span-1 lg:col-span-2">
+                        <h2 class="text-xl font-bold mb-4">Revenue (Current Month)</h2>
+                        <p class="text-3xl font-bold text-green-600 mb-4" id="relatorio-faturamento-total">$ 0.00</p>
+                        <canvas id="faturamentoChart"></canvas>
+                    </div>
+
+                    <!-- Produtos Mais Rentáveis -->
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h2 class="text-xl font-bold mb-4">Most Profitable Products</h2>
+                        <table class="w-full text-left text-sm">
+                            <thead><tr class="border-b"><th class="py-2 px-1">Product</th><th class="py-2 px-1">Revenue</th></tr></thead>
+                            <tbody id="tabela-produtos-rentaveis"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Curva ABC de Clientes -->
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h2 class="text-xl font-bold mb-4">Top 5 Clients (ABC Curve)</h2>
+                        <table class="w-full text-left text-sm">
+                            <thead><tr class="border-b"><th class="py-2 px-1">Client</th><th class="py-2 px-1">Total Spent</th></tr></thead>
+                            <tbody id="tabela-clientes-abc"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Análise de Prejuízos -->
+                    <div class="bg-white p-6 rounded-lg shadow col-span-1 lg:col-span-2" data-roles="admin">
+                        <h2 class="text-xl font-bold mb-4">Loss Analysis (Current Month)</h2>
+                        <p class="text-2xl font-bold text-red-600 mb-4" id="relatorio-prejuizo-total">$ 0.00</p>
+                        <h3 class="font-semibold mb-2">Last Entries</h3>
+                        <div class="max-h-48 overflow-y-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead><tr class="border-b"><th class="py-2 px-1">Date</th><th class="py-2 px-1">Details</th><th class="py-2 px-1">Comment</th></tr></thead>
+                                <tbody id="tabela-ultimos-prejuizos"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+        const getClienteNome = (id) => {
+            if (id === 'consumidor_final') return 'Final Consumer';
+            return db.clientes.find(c => c.id == id)?.nome || 'N/A';
+        }
+        const getFornecedorNome = (id) => db.fornecedores.find(f => f.id == id)?.nome || 'N/A';
+        const getCategoriaNome = (id) => db.categoriasEstoque.find(c => c.id == id)?.nome || 'N/A';
+        const formatCurrency = (value) => `$ ${value.toFixed(2)}`;
+
+        // --- NOTIFICAÇÃO ---
+        const notificationElement = document.getElementById('notification');
+        function showNotification(message, isSuccess = true) {
+            notificationElement.textContent = message;
+            notificationElement.className = `bg-${isSuccess ? 'green' : 'red'}-500`;
+            notificationElement.classList.add('show');
+            setTimeout(() => {
+                notificationElement.classList.remove('show');
+            }, 3000);
+        }
+
+        // --- NAVEGAÇÃO E PERMISSÕES ---
+        function updateUserPermissions() {
+            if (!currentUser) return;
+            const userRole = currentUser.role;
+            document.querySelectorAll('#sidebar-nav .nav-link').forEach(link => {
+                const allowedRoles = link.dataset.roles.split(',');
+                if (allowedRoles.includes(userRole)) {
+                    link.style.display = 'flex';
+                } else {
+                    link.style.display = 'none';
+                }
+            });
+        }
+
+        function applyContentPermissions() {
+            if (!currentUser) return;
+            const userRole = currentUser.role;
+            document.querySelectorAll('[data-roles]').forEach(el => {
+                const allowedRoles = el.dataset.roles.split(',');
+                 if (!allowedRoles.includes(userRole)) {
+                    el.style.display = 'none';
+                } else {
+                    el.style.display = ''; // Reset display
+                }
+            });
+        }
+        
+        function switchView(hash) {
+            const allowedRoutes = {
+                admin: ['#dashboard', '#orcamentos', '#pedidos', '#estoque', '#financeiro', '#clientes', '#fornecedores', '#precificar', '#prejuizos', '#relatorios'],
+                vendedor: ['#dashboard', '#orcamentos', '#pedidos', '#clientes', '#relatorios'],
+                designer: ['#dashboard', '#pedidos']
+            };
+
+            if (!currentUser || !allowedRoutes[currentUser.role].includes(hash)) {
+                showNotification("Access denied.", false);
+                window.location.hash = '#dashboard';
+                return;
+            }
+
+            document.querySelectorAll('.main-content').forEach(content => content.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active-link', 'bg-gray-700'));
+            const activeContent = document.querySelector(hash);
+            const activeLink = document.querySelector(`.nav-link[href="${hash}"]`);
+            if (activeContent) activeContent.classList.add('active');
+            if (activeLink) activeLink.classList.add('active-link', 'bg-gray-700');
+            
+            applyContentPermissions();
+
+            if(hash === '#financeiro') {
+                document.getElementById('month-filter').value = selectedMonth;
+                renderFinanceiro();
+            }
+             if(hash === '#relatorios') {
+                renderRelatorios();
+            }
+        }
+
+        window.addEventListener('hashchange', () => {
+             const hash = window.location.hash || '#dashboard';
+             if(currentUser) switchView(hash);
+        });
+
+        // --- AUTENTICAÇÃO E RENDERIZAÇÃO GERAL ---
+        function renderAll() {
+            if (currentUser) {
+                renderUserProfile();
+                updateUserPermissions();
+                renderDashboard();
+                renderTabelaOrcamentos();
+                renderTabelaPedidos();
+                renderTabelaEstoque();
+                renderFinanceiro();
+                renderTabelaClientes();
+                renderTabelaFornecedores();
+                renderPrecificar();
+                renderTabelaPrejuizos();
+                renderRelatorios();
+            } else {
+                renderLogin();
+            }
+        }
+        
+        function renderLogin() {
+            document.querySelector('main').innerHTML = `
+                <div class="flex items-center justify-center h-full">
+                    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-sm">
+                        <h2 class="text-2xl font-bold text-center mb-6">Login - Embyte Print Shop</h2>
+                        <form id="login-form">
+                            <div class="mb-4">
+                                <label class="block mb-1 font-semibold">Email</label>
+                                <input type="email" id="login-email" value="admin@embyte.com" class="w-full p-2 border rounded-md" required>
+                            </div>
+                            <div class="mb-6">
+                                <label class="block mb-1 font-semibold">Password</label>
+                                <input type="password" id="login-password" value="123" class="w-full p-2 border rounded-md" required>
+                            </div>
+                            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-semibold">Login</button>
+                        </form>
+                    </div>
+                </div>`;
+            document.getElementById('user-profile-section').innerHTML = '';
+            document.querySelectorAll('#sidebar-nav .nav-link').forEach(link => link.style.display = 'none');
+        }
+
+        function renderUserProfile() {
+            document.getElementById('user-profile-section').innerHTML = `
+                <div class="flex items-center">
+                    <img src="https://placehold.co/40x40/E2E8F0/4A5568?text=${currentUser.nome.charAt(0)}" alt="User" class="rounded-full">
+                    <div class="ml-3">
+                        <p class="font-semibold">${currentUser.nome}</p>
+                        <a href="#" id="logout-btn" class="text-sm text-gray-400 hover:text-white">Logout</a>
+                    </div>
+                </div>`;
+        }
+
+        function renderDashboard() {
+            document.getElementById('dashboard-pedidos').textContent = db.pedidos.filter(p => !['Ready', 'Delivered'].includes(p.status)).length;
+            document.getElementById('dashboard-orcamentos').textContent = db.orcamentos.filter(o => o.status === 'Pendente' || o.status === 'Aguardando Pagamento').length;
+            
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const aReceber = db.financeiro.receber
+                .filter(r => r.vencimento.startsWith(currentMonth) && !r.pago)
+                .reduce((sum, item) => sum + item.valor, 0);
+            document.getElementById('dashboard-receber').textContent = `$ ${(aReceber/1000).toFixed(1)}k`;
+
+            document.getElementById('dashboard-estoque').textContent = db.estoque.filter(item => item.qtdAtual <= item.qtdMinima).length;
+            
+            const tabelaPedidos = document.getElementById('dashboard-tabela-pedidos');
+            tabelaPedidos.innerHTML = db.pedidos.sort((a,b) => b.id - a.id).slice(0, 4).map(p => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-2 px-4 font-medium">#${p.id}</td>
+                    <td class="py-2 px-4">${getClienteNome(p.clienteId)}</td>
+                    <td class="py-2 px-4">${formatCurrency(p.valor)}</td>
+                    <td class="py-2 px-4">${renderStatusBadge(p.status)}</td>
+                </tr>
+            `).join('');
+        }
+        
+        function renderTabelaOrcamentos() {
+            const tbody = document.getElementById('tabela-orcamentos');
+            tbody.innerHTML = db.orcamentos.map(o => {
+                const productName = o.itens.length > 1 ? `${o.itens[0].produto} + ${o.itens.length - 1} item(s)` : o.itens[0].produto;
+                return `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4 font-medium">#${o.id}</td>
+                    <td class="py-3 px-4">${getClienteNome(o.clienteId)}</td>
+                    <td class="py-3 px-4">${new Date(o.data).toLocaleDateString()}</td>
+                    <td class="py-3 px-4">${formatCurrency(o.valor)}</td>
+                    <td class="py-3 px-4">${renderStatusBadge(o.status)}</td>
+                    <td class="py-3 px-4">
+                        <button data-action="approve-quote" data-id="${o.id}" data-roles="admin,vendedor" class="text-green-600 hover:text-green-800" title="Approve Quote" style="display: ${o.status === 'Pendente' ? '' : 'none'}"><i class="fas fa-check-circle"></i></button>
+                        <button data-action="generate-proposal" data-id="${o.id}" class="text-red-600 hover:text-red-800 ml-2" title="Generate PDF Proposal"><i class="fas fa-file-pdf"></i></button>
+                    </td>
+                </tr>
+            `}).join('');
+        }
+        
+        function renderTabelaPedidos() {
+            const tbody = document.getElementById('tabela-pedidos');
+            const statusOptions = ['In Production', 'Cutting', 'Finishing', 'Ready', 'Delivered'];
+            tbody.innerHTML = db.pedidos.map(p => {
+                const op = db.producao.find(op => op.pedidoId == p.id);
+                const cliente = db.clientes.find(c => c.id == p.clienteId);
+                const clienteNome = cliente ? cliente.nome : 'N/A';
+                const clienteTelefone = cliente ? cliente.telefone : '';
+                return `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4 font-medium">
+                        <div class="flex items-center">
+                            <span>#${p.id}</span>
+                            <button data-action="copy-text" data-copy-value="${p.id}" class="ml-2 text-gray-400 hover:text-blue-600 text-xs" title="Copy order number"><i class="fas fa-copy"></i></button>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center">
+                            <span>${clienteNome}</span>
+                             <button data-action="copy-text" data-copy-value="${clienteTelefone}" class="ml-2 text-gray-400 hover:text-green-600 text-xs" title="Copy client's phone"><i class="fas fa-phone"></i></button>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4">${p.produto}</td>
+                    <td class="py-3 px-4">${formatCurrency(p.valor)}</td>
+                    <td class="py-3 px-4">
+                        <select data-id="${p.id}" class="p-1 border rounded-md bg-white status-pedido-select">
+                            ${statusOptions.map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                        </select>
+                    </td>
+                     <td class="py-3 px-4">${op ? renderStatusBadge(op.setor) : renderStatusBadge('Aguardando')}</td>
+                    <td class="py-3 px-4">
+                         <button data-action="view-order" data-id="${p.id}" class="text-purple-600 hover:text-purple-800" title="View Details"><i class="fas fa-eye"></i></button>
+                         <button data-action="print-op" data-id="${p.id}" class="text-gray-600 hover:text-black ml-2" title="Print Production Order"><i class="fas fa-print"></i></button>
+                    </td>
+                </tr>
+            `}).join('');
+        }
+
+        function renderTabelaEstoque() {
+            const tbody = document.getElementById('tabela-estoque');
+            tbody.innerHTML = db.estoque.map(item => {
+                const status = item.qtdAtual <= item.qtdMinima ? 'Low' : 'OK';
+                return `
+                <tr class="border-b hover:bg-gray-50 ${status === 'Low' ? 'bg-red-50' : ''}">
+                    <td class="py-3 px-4 font-medium">${item.item}</td>
+                    <td class="py-3 px-4">${getCategoriaNome(item.categoriaId)}</td>
+                    <td class="py-3 px-4">${formatCurrency(item.precoCusto)} / ${item.unidade}</td>
+                    <td class="py-3 px-4">${item.qtdAtual}</td>
+                    <td class="py-3 px-4">${item.qtdMinima}</td>
+                    <td class="py-3 px-4">${renderStatusBadge(status)}</td>
+                    <td class="py-3 px-4 whitespace-nowrap" data-roles="admin">
+                         <button data-action="edit-stock-item" data-id="${item.id}" class="text-purple-600 hover:text-purple-800 mr-2" title="Edit Item"><i class="fas fa-edit"></i></button>
+                         <button data-action="stock-entry" data-id="${item.id}" class="text-green-600 hover:text-green-800 mr-2" title="Register Entry"><i class="fas fa-plus-circle"></i></button>
+                         <button data-action="stock-exit" data-id="${item.id}" class="text-red-600 hover:text-red-800" title="Register Exit"><i class="fas fa-minus-circle"></i></button>
+                    </td>
+                </tr>
+            `}).join('');
+        }
+        
+        function renderFinanceiro() {
+            const itemsReceber = db.financeiro.receber.filter(r => r.vencimento.startsWith(selectedMonth));
+            const itemsPagar = db.financeiro.pagar.filter(p => p.vencimento.startsWith(selectedMonth));
+            
+            const orcamentosAguardando = db.orcamentos.filter(o => o.status === 'Aguardando Pagamento');
+            const tbodyAguardando = document.getElementById('tabela-aguardando-pagamento');
+            tbodyAguardando.innerHTML = orcamentosAguardando.map(o => `
+                 <tr class="border-b hover:bg-gray-50">
+                    <td class="py-2 px-1 font-medium">#${o.id}</td>
+                    <td class="py-2 px-1">${getClienteNome(o.clienteId)}</td>
+                    <td class="py-2 px-1">${new Date(o.data).toLocaleDateString()}</td>
+                    <td class="py-2 px-1">${formatCurrency(o.valor)}</td>
+                    <td class="py-2 px-1">
+                        <button data-action="lancar-pagamento-orcamento" data-id="${o.id}" class="text-green-600 hover:text-green-800" title="Enter Payment"><i class="fas fa-dollar-sign"></i> Enter</button>
+                    </td>
+                </tr>
+            `).join('');
+
+
+            const totalRecebido = itemsReceber.filter(r => r.pago).reduce((sum, r) => sum + r.valor, 0);
+            const totalAReceber = itemsReceber.filter(r => !r.pago).reduce((sum, r) => sum + r.valor, 0);
+            const totalPago = itemsPagar.filter(p => p.pago).reduce((sum, p) => sum + p.valor, 0);
+            const totalAPagar = itemsPagar.filter(p => !p.pago).reduce((sum, p) => sum + p.valor, 0);
+
+            document.getElementById('financeiro-recebido').textContent = formatCurrency(totalRecebido);
+            document.getElementById('financeiro-a-receber').textContent = formatCurrency(totalAReceber);
+            document.getElementById('financeiro-pago').textContent = formatCurrency(totalPago);
+            document.getElementById('financeiro-a-pagar').textContent = formatCurrency(totalAPagar);
+            
+            const tbodyReceber = document.getElementById('tabela-receber');
+            tbodyReceber.innerHTML = itemsReceber.map(r => `
+                <tr class="border-b hover:bg-gray-50 ${r.pago ? 'text-gray-400 line-through' : ''}">
+                    <td class="py-2 px-1">${r.description ? `<i>${r.description}</i>` : getClienteNome(r.clienteId)}</td>
+                    <td class="py-2 px-1">${new Date(r.vencimento + 'T12:00:00').toLocaleDateString()}</td>
+                    <td class="py-2 px-1 font-medium">${formatCurrency(r.valor)}</td>
+                    <td class="py-2 px-1">
+                        ${!r.pago ? `<button data-action="mark-as-paid" data-type="receber" data-id="${r.id}" class="text-green-500 hover:text-green-700" title="Mark as Received"><i class="fas fa-check-circle"></i></button>` : `<span class="text-green-500 font-bold text-xs">RECEIVED</span>`}
+                    </td>
+                </tr>`).join('');
+            
+            const tbodyPagar = document.getElementById('tabela-pagar');
+            tbodyPagar.innerHTML = itemsPagar.map(p => `
+                <tr class="border-b hover:bg-gray-50 ${p.pago ? 'text-gray-400 line-through' : ''}">
+                    <td class="py-2 px-1">${p.fornecedorId ? getFornecedorNome(p.fornecedorId) : p.description}</td>
+                    <td class="py-2 px-1">${new Date(p.vencimento + 'T12:00:00').toLocaleDateString()}</td>
+                    <td class="py-2 px-1 font-medium">${formatCurrency(p.valor)}</td>
+                    <td class="py-2 px-1">
+                        ${!p.pago ? `<button data-action="mark-as-paid" data-type="pagar" data-id="${p.id}" class="text-green-500 hover:text-green-700" title="Mark as Paid"><i class="fas fa-check-circle"></i></button>` : `<span class="text-green-500 font-bold text-xs">PAID</span>`}
+                    </td>
+                </tr>`).join('');
+
+            document.getElementById('fluxo-caixa-content').innerHTML = `
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center"><p>Income (Realized):</p><p class="font-bold text-green-600">${formatCurrency(totalRecebido)}</p></div>
+                    <div class="flex justify-between items-center"><p>Expenses (Realized):</p><p class="font-bold text-red-600">- ${formatCurrency(totalPago)}</p></div>
+                    <hr>
+                    <div class="flex justify-between items-center text-lg"><p class="font-semibold">Monthly Balance:</p><p class="font-bold text-blue-700">${formatCurrency(totalRecebido - totalPago)}</p></div>
+                </div>`;
+        }
+
+        function renderTabelaClientes() {
+            const tbody = document.getElementById('tabela-clientes');
+            tbody.innerHTML = db.clientes.map(c => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4 font-medium">${c.nome}</td>
+                    <td class="py-3 px-4">${c.cpf}</td>
+                    <td class="py-3 px-4">${c.telefone}</td>
+                    <td class="py-3 px-4">${c.email || 'N/A'}</td>
+                    <td class="py-3 px-4">
+                         <button data-action="view-client" data-id="${c.id}" class="text-blue-600 hover:text-blue-800 mr-2" title="View Details"><i class="fas fa-eye"></i></button>
+                         <button data-action="edit-client" data-id="${c.id}" class="text-purple-600 hover:text-purple-800 mr-2" title="Edit Client"><i class="fas fa-edit"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderTabelaFornecedores() {
+            const tbody = document.getElementById('tabela-fornecedores');
+            tbody.innerHTML = db.fornecedores.map(f => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4 font-medium">${f.nome}</td>
+                    <td class="py-3 px-4">${f.contato || 'N/A'}</td>
+                    <td class="py-3 px-4">${f.telefone}</td>
+                    <td class="py-3 px-4">${f.email || 'N/A'}</td>
+                    <td class="py-3 px-4">
+                         <button data-action="edit-supplier" data-id="${f.id}" class="text-purple-600 hover:text-purple-800 mr-2" title="Edit Supplier"><i class="fas fa-edit"></i></button>
+                         <button data-action="delete-supplier" data-id="${f.id}" class="text-red-600 hover:text-red-800" title="Delete Supplier"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPrecificar() {
+             const tbodyProdutos = document.getElementById('tabela-produtos-padrao');
+            tbodyProdutos.innerHTML = db.standardProducts.map(p => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-2 px-1">${p.name}</td>
+                    <td class="py-2 px-1">${p.widthCM} x ${p.heightCM}</td>
+                    <td class="py-2 px-1">
+                        <button data-action="edit-standard-product" data-id="${p.id}" class="text-purple-600 hover:text-purple-800" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button data-action="delete-standard-product" data-id="${p.id}" class="text-red-600 hover:text-red-800 ml-2" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            const tbodyItensVendaRapida = document.getElementById('tabela-itens-venda-rapida');
+            if(tbodyItensVendaRapida) {
+                 tbodyItensVendaRapida.innerHTML = db.itensVendaRapida.map(item => `
+                 <tr class="border-b hover:bg-gray-50">
+                    <td class="py-2 px-1">${item.name}</td>
+                    <td class="py-2 px-1">${formatCurrency(item.price)}</td>
+                    <td class="py-2 px-1">
+                        <button data-action="edit-pos-item" data-id="${item.id}" class="text-purple-600 hover:text-purple-800" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button data-action="delete-pos-item" data-id="${item.id}" class="text-red-600 hover:text-red-800 ml-2" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+            }
+
+            const tbodyCores = document.getElementById('tabela-cores');
+            tbodyCores.innerHTML = db.cores.map(c => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-2 px-1">${c.nome}</td>
+                    <td class="py-2 px-1">${formatCurrency(c.custoClique)}</td>
+                    <td class="py-2 px-1">${c.lados}</td>
+                    <td class="py-2 px-1">
+                        <button data-action="edit-color" data-id="${c.id}" class="text-purple-600 hover:text-purple-800" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button data-action="delete-color" data-id="${c.id}" class="text-red-600 hover:text-red-800 ml-2" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+
+            const tbodyAcabamentos = document.getElementById('tabela-acabamentos');
+            tbodyAcabamentos.innerHTML = db.acabamentos.map(a => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-2 px-1">${a.nome}</td>
+                    <td class="py-2 px-1">${formatCurrency(a.custoPorMilheiro)}</td>
+                    <td class="py-2 px-1">
+                        <button data-action="edit-finishing" data-id="${a.id}" class="text-purple-600 hover:text-purple-800" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button data-action="delete-finishing" data-id="${a.id}" class="text-red-600 hover:text-red-800 ml-2" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderTabelaPrejuizos() {
+            const tbody = document.getElementById('tabela-prejuizos');
+            tbody.innerHTML = db.prejuizos.map(p => {
+                let detalhes = '';
+                if(p.tipo === 'valor') {
+                    detalhes = formatCurrency(p.valor);
+                } else {
+                    const item = db.estoque.find(i => i.id == p.valor);
+                    detalhes = `${p.quantidade} x ${item ? item.item : 'Item not found'}`;
+                }
+                return `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="py-3 px-4">${new Date(p.data).toLocaleDateString()}</td>
+                    <td class="py-3 px-4">${p.tipo === 'valor' ? 'Monetary Value' : 'Stock Item'}</td>
+                    <td class="py-3 px-4">${detalhes}</td>
+                    <td class="py-3 px-4">${p.comentario}</td>
+                </tr>
+            `}).join('');
+        }
+
+        function renderStatusBadge(status) {
+            const s = status ? status.toLowerCase() : '';
+            let color = 'bg-gray-200 text-gray-800';
+            if (['aprovado', 'ready', 'ok', 'delivered'].includes(s)) color = 'bg-green-200 text-green-800';
+            if (['pendente', 'in production', 'cutting', 'finishing'].includes(s)) color = 'bg-yellow-200 text-yellow-800';
+            if (s === 'low') color = 'bg-red-200 text-red-800';
+            if (s === 'awaiting payment') color = 'bg-orange-200 text-orange-800';
+            
+            // Translate status
+            const translations = {
+                'aprovado': 'Approved',
+                'pendente': 'Pending',
+                'em produção': 'In Production',
+                'em corte': 'Cutting',
+                'em acabamento': 'Finishing',
+                'pronto': 'Ready',
+                'entregue': 'Delivered',
+                'baixo': 'Low',
+                'aguardando pagamento': 'Awaiting Payment'
+            }
+
+            return `<span class="px-2 py-1 text-xs font-semibold rounded-full ${color}">${translations[s] || status}</span>`;
+        }
+        
+        function renderRelatorios() {
+            // Faturamento
+            const currentMonthRecebido = db.financeiro.receber
+                .filter(r => r.vencimento.startsWith(selectedMonth) && r.pago);
+            
+            const faturamentoTotal = currentMonthRecebido.reduce((sum, r) => sum + r.valor, 0);
+            document.getElementById('relatorio-faturamento-total').textContent = formatCurrency(faturamentoTotal);
+
+            const faturamentoPorDia = {};
+            currentMonthRecebido.forEach(r => {
+                const dia = new Date(r.vencimento + 'T12:00:00').getDate();
+                faturamentoPorDia[dia] = (faturamentoPorDia[dia] || 0) + r.valor;
+            });
+            
+            const diasNoMes = new Date(selectedMonth.split('-')[0], selectedMonth.split('-')[1], 0).getDate();
+            const labels = Array.from({ length: diasNoMes }, (_, i) => i + 1);
+            const data = labels.map(dia => faturamentoPorDia[dia] || 0);
+
+            const ctx = document.getElementById('faturamentoChart').getContext('2d');
+            if (faturamentoChart) {
+                faturamentoChart.destroy();
+            }
+            faturamentoChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Daily Revenue',
+                        data: data,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true } } }
+            });
+
+            // Produtos Rentáveis
+            const produtos = {};
+            db.pedidos.forEach(p => {
+                produtos[p.produto] = (produtos[p.produto] || 0) + p.valor;
+            });
+            const sortedProdutos = Object.entries(produtos).sort((a, b) => b[1] - a[1]);
+            document.getElementById('tabela-produtos-rentaveis').innerHTML = sortedProdutos.map(([nome, valor]) => `
+                <tr class="border-b"><td class="py-2 px-1">${nome}</td><td class="py-2 px-1">${formatCurrency(valor)}</td></tr>`).join('');
+
+            // Clientes ABC
+            const sortedClientes = [...db.clientes].sort((a,b) => b.totalGasto - a.totalGasto).slice(0,5);
+             document.getElementById('tabela-clientes-abc').innerHTML = sortedClientes.map(c => `
+                <tr class="border-b"><td class="py-2 px-1">${c.nome}</td><td class="py-2 px-1">${formatCurrency(c.totalGasto)}</td></tr>`).join('');
+
+            // Prejuízos
+            const prejuizosMes = db.prejuizos.filter(p => p.data.startsWith(selectedMonth));
+            const totalPrejuizo = prejuizosMes.reduce((sum, p) => {
+                if(p.tipo === 'valor') return sum + p.valor;
+                const item = db.estoque.find(i => i.id == p.valor);
+                return sum + ((item ? item.precoCusto : 0) * p.quantidade);
+            }, 0);
+            document.getElementById('relatorio-prejuizo-total').textContent = formatCurrency(totalPrejuizo);
+            document.getElementById('tabela-ultimos-prejuizos').innerHTML = prejuizosMes.slice(0, 5).map(p => {
+                let detalhes = p.tipo === 'valor' ? formatCurrency(p.valor) : `${p.quantidade} x ${db.estoque.find(i => i.id == p.valor)?.item || 'N/A'}`;
+                return `<tr class="border-b"><td class="py-2 px-1">${new Date(p.data).toLocaleDateString()}</td><td class="py-2 px-1">${detalhes}</td><td class="py-2 px-1">${p.comentario}</td></tr>`
+            }).join('');
+        }
+        
+        // --- MODAIS LÓGICA ---
+        const modalOrcamento = document.getElementById('modal-orcamento');
+        const modalGenerico = document.getElementById('modal-generico');
+        
+        function openModal(modal) { modal.classList.add('active'); }
+        function closeModal(modal) { modal.classList.remove('active'); }
+
+        document.querySelectorAll('.modal-close-btn').forEach(btn => {
+            btn.addEventListener('click', () => closeModal(btn.closest('.modal')));
+        });
+        
+        // --- CÁLCULO DE ORÇAMENTO ---
+        function calculateItemsPerSheet(sheetWidth, sheetHeight, itemWidth, itemHeight, margin) {
+            const usableWidth = sheetWidth - (margin * 2);
+            const usableHeight = sheetHeight - (margin * 2);
+
+            if (usableWidth <= 0 || usableHeight <= 0 || itemWidth <= 0 || itemHeight <= 0) {
+                return 0;
+            }
+
+            // Orientation 1: No rotation
+            const fit1_w = Math.floor(usableWidth / itemWidth);
+            const fit1_h = Math.floor(usableHeight / itemHeight);
+            const total1 = fit1_w * fit1_h;
+
+            // Orientation 2: Item rotated 90 degrees
+            const fit2_w = Math.floor(usableWidth / itemHeight);
+            const fit2_h = Math.floor(usableHeight / itemWidth);
+            const total2 = fit2_w * fit2_h;
+
+            return Math.max(total1, total2);
+        }
+
+        let orcamentoItemCounter = 0;
+        function addNewItemRow() {
+            orcamentoItemCounter++;
+            const container = document.getElementById('orcamento-itens-container');
+            const newItemRow = document.createElement('div');
+            newItemRow.className = 'item-row border rounded-lg p-4 space-y-4 relative bg-gray-50';
+            newItemRow.dataset.itemId = orcamentoItemCounter;
+
+            newItemRow.innerHTML = `
+                <button type="button" data-action="remove-orcamento-item" class="absolute top-2 right-2 text-red-500 hover:text-red-700" title="Remover Item"><i class="fas fa-times-circle"></i></button>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Standard Product</label>
+                        <select name="produto-padrao" class="w-full p-2 border rounded-md mt-1"></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Item Name</label>
+                        <input name="produto-nome" type="text" placeholder="E.g.: Business Card" class="w-full p-2 border rounded-md mt-1">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Width (cm)</label>
+                            <input name="item-width" type="number" step="0.1" class="w-full p-2 border rounded-md mt-1">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Height (cm)</label>
+                            <input name="item-height" type="number" step="0.1" class="w-full p-2 border rounded-md mt-1">
+                        </div>
+                    </div>
+                    <div>
+                         <label class="block text-sm font-medium text-gray-700">Paper</label>
+                         <select name="papel" class="w-full p-2 border rounded-md mt-1"></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Quantity</label>
+                        <input name="qtd" type="number" value="1000" class="w-full p-2 border rounded-md mt-1">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Colors</label>
+                        <select name="cores" class="w-full p-2 border rounded-md mt-1"></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Finishing</label>
+                        <select name="acabamento" class="w-full p-2 border rounded-md mt-1"></select>
+                    </div>
+                    <div class="flex items-end justify-end">
+                        <p class="text-lg font-bold text-right">Subtotal: <span class="item-subtotal text-blue-600">${formatCurrency(0)}</span></p>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(newItemRow);
+            populateQuoteModalSelectors(newItemRow);
+            updateAllPrices();
+        }
+
+        function populateQuoteModalSelectors(row) {
+            const produtoSelect = row.querySelector('select[name="produto-padrao"]');
+            const papelSelect = row.querySelector('select[name="papel"]');
+            const coresSelect = row.querySelector('select[name="cores"]');
+            const acabamentoSelect = row.querySelector('select[name="acabamento"]');
+            
+            produtoSelect.innerHTML = `<option value="custom">-- Custom --</option>` + db.standardProducts.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+            const categoriaPapel = db.categoriasEstoque.find(c => c.nome.toLowerCase() === 'paper');
+            papelSelect.innerHTML = db.estoque
+                .filter(item => item.categoriaId === categoriaPapel?.id)
+                .map(item => `<option value="${item.id}">${item.item}</option>`)
+                .join('');
+            
+            coresSelect.innerHTML = db.cores.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+            acabamentoSelect.innerHTML = db.acabamentos.map(a => `<option value="${a.id}">${a.nome}</option>`).join('');
+        }
+        
+        function calculateItemPrice(row) {
+             try {
+                const papelId = row.querySelector('[name="papel"]').value;
+                const corId = row.querySelector('[name="cores"]').value;
+                const acabamentoId = row.querySelector('[name="acabamento"]').value;
+                const qtd = parseInt(row.querySelector('[name="qtd"]').value);
+                const itemWidth = parseFloat(row.querySelector('[name="item-width"]').value);
+                const itemHeight = parseFloat(row.querySelector('[name="item-height"]').value);
+                const margem = parseFloat(document.getElementById('orcamento-margem')?.value || 0.5); 
+
+                const papel = db.estoque.find(i => i.id == papelId);
+
+                const itemsPerSheet = papel ? calculateItemsPerSheet(papel.widthCM, papel.heightCM, itemWidth, itemHeight, margem) : 0;
+                
+                const displayElement = document.getElementById('itens-por-folha-display');
+                if(row.dataset.itemId == 1 && displayElement) displayElement.innerHTML = `${itemsPerSheet} <span class="text-sm font-normal">un/folha</span>`;
+
+
+                if (isNaN(qtd) || qtd <= 0 || itemsPerSheet <= 0) {
+                    return 0;
+                }
+                
+                const cor = db.cores.find(c => c.id == corId);
+                const acabamento = db.acabamentos.find(a => a.id == acabamentoId);
+
+                if (!papel || !cor || !acabamento) {
+                    return 0;
+                }
+                
+                const CUSTO_SETUP = 25.00;
+                const MARGEM_PERDA = 1.10; // 10% de perda
+                const MARGEM_LUCRO = 1.8;
+
+                const folhasNecessarias = Math.ceil(qtd / itemsPerSheet) * MARGEM_PERDA;
+                const custoPapel = folhasNecessarias * papel.precoCusto;
+                const custoImpressao = qtd * cor.lados * cor.custoClique;
+                const custoAcabamento = (qtd / 1000) * acabamento.custoPorMilheiro;
+
+                const custoTotal = CUSTO_SETUP + custoPapel + custoImpressao + custoAcabamento;
+                return custoTotal * MARGEM_LUCRO;
+                
+            } catch (error) {
+                console.error("Error calculating item price:", error);
+                return 0;
+            }
+        }
+        
+        function updateAllPrices() {
+            let grandTotal = 0;
+            const itemRows = document.querySelectorAll('#orcamento-itens-container .item-row');
+            itemRows.forEach(row => {
+                const itemPrice = calculateItemPrice(row);
+                row.querySelector('.item-subtotal').textContent = formatCurrency(itemPrice);
+                grandTotal += itemPrice;
+            });
+            document.getElementById('preco-calculado').textContent = formatCurrency(grandTotal);
+        }
+
+        // --- MANIPULADORES DE FORMULÁRIO (MODAL GENÉRICO) ---
+        function openGenericModal(title, formHTML) {
+            document.getElementById('modal-generico-title').textContent = title;
+            document.getElementById('modal-generico-content').innerHTML = formHTML;
+            openModal(modalGenerico);
+        }
+
+        // --- VALIDAÇÃO E MÁSCARAS ---
+        function validaCPF(cpf) {
+            cpf = cpf.replace(/[^\d]+/g, '');
+            if (cpf == '') return false;
+            if (cpf.length != 11 || /^(\d)\1+$/.test(cpf)) return false;
+            let add = 0;
+            for (let i = 0; i < 9; i++) add += parseInt(cpf.charAt(i)) * (10 - i);
+            let rev = 11 - (add % 11);
+            if (rev == 10 || rev == 11) rev = 0;
+            if (rev != parseInt(cpf.charAt(9))) return false;
+            add = 0;
+            for (let i = 0; i < 10; i++) add += parseInt(cpf.charAt(i)) * (11 - i);
+            rev = 11 - (add % 11);
+            if (rev == 10 || rev == 11) rev = 0;
+            if (rev != parseInt(cpf.charAt(10))) return false;
+            return true;
+        }
+
+        function maskCPF(value) {
+            return value
+                .replace(/\D/g, '')
+                .replace(/(\d{3})(\d)/, '$1.$2')
+                .replace(/(\d{3})(\d)/, '$1.$2')
+                .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+                .slice(0, 14);
+        }
+
+        function maskPhone(value) {
+            return value
+                .replace(/\D/g, '')
+                .replace(/(\d{2})(\d)/, '($1) $2')
+                .replace(/(\d{5})(\d)/, '$1-$2')
+                .slice(0, 15);
+        }
+        
+        function createOrderFromQuote(quote) {
+            quote.status = 'Approved';
+            quote.itens.forEach(item => {
+                const newPedidoId = (db.pedidos.length > 0 ? Math.max(...db.pedidos.map(p => p.id)) : 202500) + 1;
+                const newPedido = { 
+                    id: newPedidoId, 
+                    orcamentoId: quote.id, 
+                    clienteId: quote.clienteId, 
+                    data: new Date().toISOString().slice(0,10), 
+                    valor: item.price, 
+                    status: "In Production", 
+                    produto: item.produto 
+                };
+                db.pedidos.push(newPedido);
+                db.producao.push({ 
+                    op: (db.producao.length > 0 ? Math.max(...db.producao.map(p => p.op)) : 100) + 1, 
+                    pedidoId: newPedidoId, 
+                    produto: newPedido.produto, 
+                    setor: 'Printing' 
+                });
+
+                // --- DEDUÇÃO AUTOMÁTICA DE ESTOQUE ---
+                const papel = db.estoque.find(i => i.id == item.papelId);
+                if (papel) {
+                    const itemsPerSheet = calculateItemsPerSheet(papel.widthCM, papel.heightCM, item.itemWidth, item.itemHeight, item.margem);
+                    if (itemsPerSheet > 0) {
+                        const MARGEM_PERDA = 1.10; // 10%
+                        const folhasNecessarias = Math.ceil((item.quantidade / itemsPerSheet) * MARGEM_PERDA);
+                        
+                        papel.qtdAtual -= folhasNecessarias;
+
+                        if (papel.qtdAtual < 0) {
+                            showNotification(`Warning: Stock for "${papel.item}" is now negative!`, false);
+                        } else if (papel.qtdAtual <= papel.qtdMinima) {
+                            showNotification(`Warning: Low stock for "${papel.item}"!`, false);
+                        }
+                    }
+                }
+            });
+            showNotification(`Quote #${quote.id} approved and Order(s) generated!`);
+        }
+
+        function generateAndOpenOP(data) {
+            const { pedido, orcamento, item, cliente, op, papel, cor, acabamento } = data;
+            const opWindow = window.open('', '_blank');
+            opWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Production Order #${op.op}</title>
+                        <script src="https://cdn.tailwindcss.com"><\/script>
+                        <style>
+                            @media print {
+                                .no-print { display: none; }
+                            }
+                            body { font-family: sans-serif; }
+                        </style>
+                    </head>
+                    <body class="p-8">
+                        <div class="max-w-4xl mx-auto bg-white p-8 border rounded-lg">
+                            <div class="flex justify-between items-center border-b pb-4">
+                                <div>
+                                    <h1 class="text-3xl font-bold">Production Order</h1>
+                                    <h2 class="text-xl font-bold text-red-600">PO #${op.op}</h2>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold">Embyte Print Shop</p>
+                                    <p class="text-sm">${companyData.nome}</p>
+                                    <p class="text-sm">CNPJ: ${companyData.cnpj}</p>
+                                    <p class="text-sm">Tel: ${companyData.telefone}</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-8 mt-6">
+                                <div>
+                                    <h3 class="font-bold text-lg mb-2">Order Details</h3>
+                                    <p><strong>Order #:</strong> ${pedido.id}</p>
+                                    <p><strong>Client:</strong> ${cliente.nome}</p>
+                                    <p><strong>Order Date:</strong> ${new Date(pedido.data).toLocaleDateString()}</p>
+                                    <p><strong>Delivery Date:</strong> ${orcamento.entregaData ? new Date(orcamento.entregaData + 'T12:00:00').toLocaleDateString() + ' at ' + orcamento.entregaHora : 'To be defined'}</p>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-lg mb-2">Product</h3>
+                                    <p><strong>Name:</strong> ${item.produto}</p>
+                                    <p><strong>Quantity:</strong> ${item.quantidade} units</p>
+                                    <p><strong>Dimensions:</strong> ${item.itemWidth} x ${item.itemHeight} cm</p>
+                                </div>
+                            </div>
+                            <div class="mt-6 border-t pt-4">
+                                <h3 class="font-bold text-lg mb-2">Technical Specifications</h3>
+                                <div class="grid grid-cols-3 gap-4 text-sm">
+                                    <p><strong>Paper:</strong> ${papel.item}</p>
+                                    <p><strong>Colors:</strong> ${cor.nome}</p>
+                                    <p><strong>Finishing:</strong> ${acabamento.nome}</p>
+                                </div>
+                            </div>
+                            <div class="mt-6 border-t pt-4">
+                                <h3 class="font-bold text-lg mb-2">Notes</h3>
+                                <p class="bg-gray-100 p-2 rounded min-h-[50px]">${orcamento.obs || 'No notes.'}</p>
+                            </div>
+                             <div class="mt-8 text-center no-print">
+                                <button onclick="window.print()" class="bg-blue-600 text-white px-8 py-2 rounded-lg hover:bg-blue-700">Print</button>
+                            </div>
+                        </div>
+                    </body>
+                </html>
+            `);
+            opWindow.document.close();
+        }
+
+        // --- EVENT LISTENERS PARA AÇÕES ---
+        document.body.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formId = e.target.id;
+            const formType = e.target.dataset.type;
+
+            if (formId === 'login-form') {
+                const email = e.target.querySelector('#login-email').value;
+                const password = e.target.querySelector('#login-password').value;
+                const user = db.users.find(u => u.email === email && u.password === password);
+                if (user) {
+                    currentUser = user;
+                    document.querySelector('main').innerHTML = mainHTMLTemplate;
+                    window.location.hash = '#dashboard';
+                    renderAll();
+                    switchView('#dashboard');
+                } else {
+                    showNotification("Invalid email or password.", false);
+                }
+            } else if (formId === 'form-orcamento') {
+                const newItems = [];
+                const itemRows = document.querySelectorAll('#orcamento-itens-container .item-row');
+                itemRows.forEach(row => {
+                    newItems.push({
+                        produto: row.querySelector('[name="produto-nome"]').value,
+                        price: calculateItemPrice(row),
+                        papelId: parseInt(row.querySelector('[name="papel"]').value),
+                        corId: parseInt(row.querySelector('[name="cores"]').value),
+                        acabamentoId: parseInt(row.querySelector('[name="acabamento"]').value),
+                        quantidade: parseInt(row.querySelector('[name="qtd"]').value),
+                        itemWidth: parseFloat(row.querySelector('[name="item-width"]').value),
+                        itemHeight: parseFloat(row.querySelector('[name="item-height"]').value),
+                        margem: parseFloat(document.getElementById('orcamento-margem')?.value || 0.5)
+                    });
+                });
+
+                const newQuote = {
+                    id: (db.orcamentos.length > 0 ? Math.max(...db.orcamentos.map(o => o.id)) : 0) + 1,
+                    clienteId: parseInt(document.getElementById('orcamento-cliente').value),
+                    data: new Date().toISOString().slice(0,10),
+                    valor: parseFloat(document.getElementById('preco-calculado').textContent.replace('$ ', '')),
+                    status: 'Pendente',
+                    itens: newItems,
+                    obs: document.getElementById('orcamento-obs').value,
+                    entregaData: document.getElementById('orcamento-entrega-data').value,
+                    entregaHora: document.getElementById('orcamento-entrega-hora').value
+                };
+                db.orcamentos.push(newQuote);
+                showNotification("Quote saved successfully!");
+                closeModal(modalOrcamento);
+                renderAll();
+            } else if (formType === 'client') {
+                 const entityId = e.target.dataset.id;
+                 const client = entityId ? db.clientes.find(c => c.id == entityId) : null;
+                 const cpfInput = e.target.cpf;
+                 if (!validaCPF(cpfInput.value)) {
+                    showNotification("Invalid CPF. Please correct.", false);
+                    cpfInput.classList.add('input-error');
+                    return;
+                 }
+                 const newClientData = {
+                    nome: e.target.nome.value,
+                    telefone: e.target.telefone.value,
+                    cpf: e.target.cpf.value,
+                    email: e.target.email.value,
+                    empresa: e.target.empresa.value
+                 };
+                 if (client) {
+                    Object.assign(client, newClientData);
+                    showNotification("Client updated successfully!");
+                 } else {
+                    newClientData.id = (db.clientes.length > 0 ? Math.max(...db.clientes.map(c => c.id)) : 0) + 1;
+                    newClientData.totalGasto = 0;
+                    db.clientes.push(newClientData);
+                    showNotification("Client added successfully!");
+                 }
+                 closeModal(modalGenerico);
+                 renderAll();
+            } else if (formType === 'stock') {
+                const entityId = e.target.dataset.id;
+                const item = entityId ? db.estoque.find(i => i.id == entityId) : null;
+                const itemData = {
+                    item: e.target.item.value,
+                    categoriaId: parseInt(e.target.categoriaId.value),
+                    unidade: e.target.unidade.value,
+                    fornecedorId: parseInt(e.target.fornecedorId.value),
+                    precoCusto: parseFloat(e.target.precoCusto.value),
+                    qtdMinima: parseInt(e.target.qtdMinima.value),
+                    widthCM: parseFloat(e.target.widthCM.value),
+                    heightCM: parseFloat(e.target.heightCM.value),
+                };
+
+                if (item) { // Editing
+                    Object.assign(item, itemData);
+                    showNotification("Stock item updated!");
+                } else { // Adding
+                    itemData.id = (db.estoque.length > 0 ? Math.max(...db.estoque.map(i => i.id)) : 0) + 1;
+                    itemData.qtdAtual = parseInt(e.target.qtdAtual.value);
+                    db.estoque.push(itemData);
+                    showNotification("Stock item added!");
+                }
+                closeModal(modalGenerico);
+                renderAll();
+            } else if (formType === 'supplier') {
+                const supplierId = e.target.dataset.id;
+                const supplier = supplierId ? db.fornecedores.find(f => f.id == supplierId) : null;
+                const supplierData = {
+                    nome: e.target.nome.value,
+                    contato: e.target.contato.value,
+                    telefone: e.target.telefone.value,
+                    email: e.target.email.value,
+                    cnpj: e.target.cnpj.value,
+                    endereco: e.target.endereco.value
+                };
+                if(supplier) {
+                    Object.assign(supplier, supplierData);
+                    showNotification("Supplier updated!");
+                } else {
+                    supplierData.id = (db.fornecedores.length > 0 ? Math.max(...db.fornecedores.map(f => f.id)) : 0) + 1;
+                    db.fornecedores.push(supplierData);
+                    showNotification("Supplier added!");
+                }
+                closeModal(modalGenerico);
+                renderAll();
+            } else if (formType === 'stock-update') {
+                const itemId = e.target.itemId.value;
+                const updateType = e.target.updateType.value;
+                const qty = parseInt(e.target.qty.value);
+                const item = db.estoque.find(i => i.id == itemId);
+
+                if(item && !isNaN(qty) && qty > 0){
+                    item.qtdAtual += (updateType === 'entry' ? qty : -qty);
+                    showNotification("Stock updated!");
+                }
+                closeModal(modalGenerico);
+                renderAll();
+            } else if (formType === 'category-add') {
+                const newCategoryName = e.target.categoryName.value;
+                if(newCategoryName) {
+                    const newCategory = {
+                        id: (db.categoriasEstoque.length > 0 ? Math.max(...db.categoriasEstoque.map(c => c.id)) : 0) + 1,
+                        nome: newCategoryName
+                    };
+                    db.categoriasEstoque.push(newCategory);
+                    showNotification("Category added!");
+                    document.querySelector('[data-action="manage-categories"]').click();
+                }
+            } else if (formType === 'finance-entry') {
+                const entryType = e.target.dataset.entryType;
+                const newEntry = {
+                    id: (db.financeiro[entryType].length > 0 ? Math.max(...db.financeiro[entryType].map(i => i.id)) : 0) + 1,
+                    vencimento: e.target.vencimento.value,
+                    valor: parseFloat(e.target.valor.value),
+                    pago: false
+                };
+                if(entryType === 'receber') {
+                    newEntry.clienteId = parseInt(e.target.clienteId.value);
+                } else {
+                    newEntry.fornecedorId = parseInt(e.target.fornecedorId.value);
+                    newEntry.description = e.target.description.value;
+                }
+                db.financeiro[entryType].push(newEntry);
+                showNotification("Financial entry added!");
+                closeModal(modalGenerico);
+                renderFinanceiro();
+            } else if (formType === 'standard-product') {
+                const productId = e.target.dataset.id;
+                const product = productId ? db.standardProducts.find(p => p.id == productId) : null;
+                const productData = {
+                    name: e.target.name.value,
+                    widthCM: parseFloat(e.target.widthCM.value),
+                    heightCM: parseFloat(e.target.heightCM.value),
+                };
+                if(product) {
+                    Object.assign(product, productData);
+                    showNotification("Standard product updated!");
+                } else {
+                    productData.id = (db.standardProducts.length > 0 ? Math.max(...db.standardProducts.map(p => p.id)) : 0) + 1;
+                    db.standardProducts.push(productData);
+                    showNotification("Standard product added!");
+                }
+                closeModal(modalGenerico);
+                renderPrecificar();
+            } else if (formType === 'pricing') {
+                const pricingType = e.target.dataset.pricingType;
+                const entityId = e.target.dataset.id;
+                const item = entityId ? db[pricingType].find(i => i.id == entityId) : null;
+
+                if (pricingType === 'cores') {
+                    const itemData = {
+                        nome: e.target.nome.value,
+                        custoClique: parseFloat(e.target.custo.value),
+                        lados: parseInt(e.target.lados.value)
+                    };
+                    if (item) {
+                        Object.assign(item, itemData);
+                        showNotification("Printing cost updated!");
+                    } else {
+                        itemData.id = (db.cores.length > 0 ? Math.max(...db.cores.map(i => i.id)) : 0) + 1;
+                        db.cores.push(itemData);
+                        showNotification("Printing cost added!");
+                    }
+                } else if (pricingType === 'acabamentos') {
+                    const itemData = {
+                        nome: e.target.nome.value,
+                        custoPorMilheiro: parseFloat(e.target.custo.value)
+                    };
+                    if (item) {
+                        Object.assign(item, itemData);
+                        showNotification("Finishing cost updated!");
+                    } else {
+                        itemData.id = (db.acabamentos.length > 0 ? Math.max(...db.acabamentos.map(i => i.id)) : 0) + 1;
+                        db.acabamentos.push(itemData);
+                        showNotification("Finishing cost added!");
+                    }
+                } else if (pricingType === 'itensVendaRapida') {
+                    const itemData = {
+                        name: e.target.name.value,
+                        price: parseFloat(e.target.price.value)
+                    };
+                    if(item){
+                        Object.assign(item, itemData);
+                        showNotification("POS item updated!");
+                    } else {
+                        itemData.id = (db.itensVendaRapida.length > 0 ? Math.max(...db.itensVendaRapida.map(i => i.id)) : 0) + 1;
+                        db.itensVendaRapida.push(itemData);
+                        showNotification("POS item added!");
+                    }
+                }
+                closeModal(modalGenerico);
+                renderPrecificar();
+            } else if (formType === 'prejuizo') {
+                const tipo = e.target.tipoPrejuizo.value;
+                const comentario = e.target.comentario.value;
+                
+                if(!comentario) {
+                    showNotification("Comment is required.", false);
+                    return;
+                }
+
+                const newLoss = {
+                    id: (db.prejuizos.length > 0 ? Math.max(...db.prejuizos.map(p => p.id)) : 0) + 1,
+                    data: new Date().toISOString().slice(0,10),
+                    tipo: tipo,
+                    comentario: comentario,
+                };
+
+                if (tipo === 'valor') {
+                    const valor = parseFloat(e.target.valorPrejuizo.value);
+                    if (isNaN(valor) || valor <= 0) {
+                        showNotification("Please enter a valid amount.", false);
+                        return;
+                    }
+                    newLoss.valor = valor;
+                } else if (tipo === 'item') {
+                    const itemId = parseInt(e.target.itemPrejuizo.value);
+                    const quantidade = parseInt(e.target.quantidadePrejuizo.value);
+                    const itemEstoque = db.estoque.find(i => i.id === itemId);
+
+                    if (!itemEstoque || isNaN(quantidade) || quantidade <= 0) {
+                        showNotification("Please select an item and enter a valid quantity.", false);
+                        return;
+                    }
+                    
+                    itemEstoque.qtdAtual -= quantidade;
+                    newLoss.valor = itemId;
+                    newLoss.quantidade = quantidade;
+                }
+
+                db.prejuizos.push(newLoss);
+                showNotification("Loss logged successfully!");
+                closeModal(modalGenerico);
+                renderAll();
+            }
+        });
+
+        document.body.addEventListener('click', async (e) => {
+            const target = e.target.closest('button, a');
+            if (!target) return;
+
+            // --- Ações baseadas em ID (para botões especiais) ---
+            if (target.id === 'logout-btn') {
+                e.preventDefault();
+                currentUser = null;
+                window.location.hash = '';
+                renderAll();
+                return;
+            }
+            if (target.id === 'novo-orcamento-btn') {
+                document.getElementById('form-orcamento').reset();
+                document.getElementById('orcamento-itens-container').innerHTML = ''; // Limpa itens
+                addNewItemRow();
+                const selectCliente = document.getElementById('orcamento-cliente');
+                selectCliente.innerHTML = db.clientes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+                openModal(modalOrcamento);
+                return;
+            }
+             if (target.id === 'add-orcamento-item-btn') {
+                addNewItemRow();
+                return;
+            }
+            if (target.id === 'novo-cliente-btn') {
+                 openGenericModal('New Client', `
+                    <form data-type="client">
+                        <div class="space-y-4">
+                            <div><label class="block mb-1">Full Name <span class="text-red-500">*</span></label><input name="nome" type="text" class="w-full p-2 border rounded" required></div>
+                            <div><label class="block mb-1">ID (CPF) <span class="text-red-500">*</span></label><input name="cpf" type="text" class="w-full p-2 border rounded" placeholder="000.000.000-00" required><div class="error-message"></div></div>
+                            <div><label class="block mb-1">Phone <span class="text-red-500">*</span></label><input name="telefone" type="text" class="w-full p-2 border rounded" placeholder="(00) 00000-0000" required></div>
+                            <div><label class="block mb-1">Email (Optional)</label><input name="email" type="email" class="w-full p-2 border rounded"></div>
+                            <div><label class="block mb-1">Company (Optional)</label><input name="empresa" type="text" class="w-full p-2 border rounded"></div>
+                        </div>
+                        <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded">Save</button></div>
+                    </form>`);
+                return;
+            }
+            if (target.id === 'novo-fornecedor-btn') {
+                 openGenericModal('New Supplier', `
+                    <form data-type="supplier">
+                        <div class="space-y-4">
+                            <div><label class="block mb-1">Company Name</label><input name="nome" type="text" class="w-full p-2 border rounded" required></div>
+                            <div><label class="block mb-1">Contact Name</label><input name="contato" type="text" class="w-full p-2 border rounded"></div>
+                            <div><label class="block mb-1">Phone</label><input name="telefone" type="text" class="w-full p-2 border rounded" required></div>
+                            <div><label class="block mb-1">Email</label><input name="email" type="email" class="w-full p-2 border rounded"></div>
+                            <div><label class="block mb-1">ID (CNPJ)</label><input name="cnpj" type="text" class="w-full p-2 border rounded"></div>
+                            <div><label class="block mb-1">Address</label><input name="endereco" type="text" class="w-full p-2 border rounded"></div>
+                        </div>
+                        <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded">Save</button></div>
+                    </form>`);
+                return;
+            }
+            if (target.id === 'novo-prejuizo-btn') {
+                const stockOptions = db.estoque.map(i => `<option value="${i.id}">${i.item}</option>`).join('');
+                openGenericModal('Log New Loss', `
+                    <form data-type="prejuizo">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block mb-1 font-semibold">Loss Type</label>
+                                <div class="flex space-x-4">
+                                    <label><input type="radio" name="tipoPrejuizo" value="valor" checked> Monetary Value</label>
+                                    <label><input type="radio" name="tipoPrejuizo" value="item"> Stock Item</label>
+                                </div>
+                            </div>
+                            <div id="prejuizo-valor-div">
+                                <label class="block mb-1">Loss Amount ($)</label>
+                                <input name="valorPrejuizo" type="number" step="0.01" class="w-full p-2 border rounded">
+                            </div>
+                            <div id="prejuizo-item-div" class="hidden">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block mb-1">Stock Item</label>
+                                        <select name="itemPrejuizo" class="w-full p-2 border rounded">${stockOptions}</select>
+                                    </div>
+                                    <div>
+                                        <label class="block mb-1">Quantity Lost</label>
+                                        <input name="quantidadePrejuizo" type="number" class="w-full p-2 border rounded">
+                                    </div>
+                                </div>
+                            </div>
+                             <div>
+                                <label class="block mb-1">Comment / Reason</label>
+                                <textarea name="comentario" rows="3" class="w-full p-2 border rounded" required></textarea>
+                            </div>
+                        </div>
+                        <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-red-600 text-white rounded">Log</button></div>
+                    </form>`);
+                
+                // Add event listener for radio buttons inside the modal
+                document.querySelector('form[data-type="prejuizo"]').addEventListener('change', e => {
+                    if (e.target.name === 'tipoPrejuizo') {
+                        document.getElementById('prejuizo-valor-div').classList.toggle('hidden', e.target.value !== 'valor');
+                        document.getElementById('prejuizo-item-div').classList.toggle('hidden', e.target.value !== 'item');
+                    }
+                });
+                return;
+            }
+
+            // --- Ações baseadas em Data Attributes ---
+            const action = target.dataset.action;
+            const id = target.dataset.id;
+            
+            if (action) {
+                switch(action) {
+                    case 'copy-text':
+                        const textToCopy = target.dataset.copyValue;
+                        navigator.clipboard.writeText(textToCopy).then(() => showNotification(`"${textToCopy}" copied!`));
+                        break;
+                    case 'remove-orcamento-item':
+                        target.closest('.item-row').remove();
+                        updateAllPrices();
+                        break;
+                    case 'approve-quote':
+                        const orcamento = db.orcamentos.find(o => o.id == id);
+                        if (orcamento && orcamento.status === 'Pendente') {
+                           orcamento.status = 'Aguardando Pagamento';
+                            
+                            const newReceivable = {
+                                id: (db.financeiro.receber.length > 0 ? Math.max(...db.financeiro.receber.map(i => i.id)) : 0) + 1,
+                                clienteId: orcamento.clienteId, 
+                                vencimento: new Date().toISOString().slice(0,10), 
+                                valor: orcamento.valor * 0.5, 
+                                pago: false,
+                                quoteId: orcamento.id,
+                                description: `Down payment for Quote #${orcamento.id}`
+                            };
+                            db.financeiro.receber.push(newReceivable);
+                            
+                            showNotification(`Down payment for Quote #${orcamento.id} added to finance.`);
+                            renderAll();
+                        }
+                        break;
+                    case 'generate-proposal':
+                        const orc = db.orcamentos.find(o => o.id == id);
+                        const cliente = db.clientes.find(c => c.id == orc.clienteId);
+                        showNotification("Generating PDF proposal...", true);
+                        
+                        const { jsPDF } = window.jspdf;
+                        const doc = new jsPDF();
+                        const pageHeight = doc.internal.pageSize.height;
+                        const pageWidth = doc.internal.pageSize.width;
+                        const margin = 14;
+                        let yPos = 0;
+
+                        const addHeader = () => {
+                            yPos = 20;
+                            doc.setFontSize(18);
+                            doc.text("Commercial Proposal", pageWidth / 2, yPos, { align: 'center' });
+                            yPos += 7;
+                            doc.setFontSize(10);
+                            doc.text("Embyte Print Shop", pageWidth / 2, yPos, { align: 'center' });
+                            yPos += 5;
+                            doc.text(companyData.nome, pageWidth / 2, yPos, { align: 'center' });
+                            yPos += 5;
+                            doc.text(`CNPJ: ${companyData.cnpj} | Tel: ${companyData.telefone}`, pageWidth / 2, yPos, { align: 'center' });
+                            yPos += 5;
+                            doc.text(companyData.endereco, pageWidth / 2, yPos, { align: 'center' });
+                            yPos += 10;
+                        };
+                        
+                        const addFooter = (pageNumber, pageCount) => {
+                            doc.setFontSize(8);
+                            doc.text(`Proposal valid for 7 days.`, margin, pageHeight - 10);
+                            doc.text(`Page ${pageNumber} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: 'right'});
+                        };
+
+                        const checkPageBreak = (neededHeight) => {
+                            if (yPos + neededHeight > pageHeight - 25) { // 25 for footer margin
+                                doc.addPage();
+                                addHeader();
+                            }
+                        };
+                        
+                        addHeader();
+
+                        // Dados do Cliente e Proposta
+                        doc.setFontSize(12);
+                        doc.text(`Proposal No.: ${orc.id}`, margin, yPos);
+                        doc.text(`Date: ${new Date(orc.data).toLocaleDateString()}`, pageWidth - margin, yPos, {align: 'right'});
+                        yPos += 7;
+                        doc.text(`Client: ${cliente.nome} (${cliente.empresa || 'Individual'})`, margin, yPos);
+                        yPos += 7;
+                         if(orc.entregaData) {
+                             doc.text(`Estimated Delivery Date: ${new Date(orc.entregaData + 'T12:00:00').toLocaleDateString()} ${orc.entregaHora || ''}`, margin, yPos);
+                         }
+                        yPos += 10;
+                        doc.line(margin, yPos - 5, pageWidth - margin, yPos - 5);
+                        
+                        // Tabela de Itens Header
+                        doc.setFontSize(10);
+                        doc.setFont(undefined, 'bold');
+                        doc.text("Item Description", margin + 2, yPos);
+                        doc.text("Qty.", 140, yPos);
+                        doc.text("Subtotal", 175, yPos);
+                        yPos += 2;
+                        doc.line(margin, yPos, pageWidth - margin, yPos);
+                        yPos += 5;
+
+                        doc.setFont(undefined, 'normal');
+                        orc.itens.forEach((item) => {
+                            const papel = db.estoque.find(i => i.id == item.papelId)?.item || '';
+                            const cor = db.cores.find(c => c.id == item.corId)?.nome || '';
+                            const acabamento = db.acabamentos.find(a => a.id == item.acabamentoId)?.nome || '';
+                            
+                            const descriptionLines = doc.splitTextToSize(
+                                `${item.produto} (Paper: ${papel}, Colors: ${cor}, Finishing: ${acabamento}, Size: ${item.itemWidth}x${item.itemHeight}cm)`,
+                                120 // Largura da coluna de descrição
+                            );
+
+                            const itemHeight = descriptionLines.length * 5 + 8; // Altura estimada da linha + padding
+                            checkPageBreak(itemHeight);
+
+                            doc.text(descriptionLines, margin + 2, yPos);
+                            doc.text(item.quantidade.toString(), 142, yPos);
+                            doc.text(formatCurrency(item.price), 196 - margin, yPos, { align: 'right' });
+                            yPos += itemHeight;
+                        });
+                        
+                        yPos += 5;
+                        checkPageBreak(50);
+                        doc.setFontSize(14);
+                        doc.setFont(undefined, 'bold');
+                        doc.text(`Total Value: ${formatCurrency(orc.valor)}`, pageWidth - margin, yPos, { align: 'right' });
+                        yPos += 15;
+
+                        // Termos e Condições
+                        checkPageBreak(70);
+                        doc.setFontSize(10);
+                        doc.setFont(undefined, 'bold');
+                        doc.text("Important Information:", margin, yPos);
+                        doc.setFont(undefined, 'normal');
+                        doc.setDrawColor(200, 200, 200);
+                        yPos += 2;
+                        
+                        const terms = [
+                            "- A minimum payment of 50% of the value is required to start the production and design of your material.",
+                            "- The final approval of the artwork is the client's responsibility. Please check all information.",
+                            "- There may be slight color variations between the screen and the printed material.",
+                            "- This proposal is valid for 7 days."
+                        ];
+                        const splitTerms = doc.splitTextToSize(terms.join('\n'), pageWidth - (margin*2) - 4);
+                        const termsHeight = splitTerms.length * 5 + 10;
+                        doc.rect(margin, yPos, pageWidth - (margin * 2), termsHeight);
+                        doc.text(splitTerms, margin + 2, yPos + 5);
+                        yPos += termsHeight + 5;
+
+                        doc.setFont(undefined, 'bold');
+                        doc.text("ATTENTION: Other sectors cannot access your order for production without the initial payment.", margin, yPos);
+                        
+                        // Assinaturas
+                        checkPageBreak(50);
+                        yPos = pageHeight - 50; // Posiciona no final da página
+                        doc.line(30, yPos, 90, yPos);
+                        doc.text("Salesperson", 60, yPos + 5, {align: 'center'});
+                        doc.line(120, yPos, 180, yPos);
+                        doc.text("Client", 150, yPos + 5, {align: 'center'});
+                        if (orc.valor > 200) {
+                            yPos += 20;
+                            doc.line(75, yPos, 135, yPos);
+                            doc.text("Manager", 105, yPos + 5, {align: 'center'});
+                        }
+
+                        // Adiciona footer em todas as páginas
+                        const pageCount = doc.internal.getNumberOfPages();
+                        for(let i = 1; i <= pageCount; i++) {
+                            doc.setPage(i);
+                            addFooter(i, pageCount); 
+                        }
+
+                        doc.save(`proposal_${orc.id}_${cliente.nome.replace(' ', '_')}.pdf`);
+                        break;
+                    case 'print-op':
+                        const pedidoParaImprimir = db.pedidos.find(p => p.id == id);
+                        if (pedidoParaImprimir) {
+                            const orcamentoOP = db.orcamentos.find(o => o.id === pedidoParaImprimir.orcamentoId);
+                            const clienteOP = db.clientes.find(c => c.id === pedidoParaImprimir.clienteId);
+                            const op = db.producao.find(o => o.pedidoId === pedidoParaImprimir.id);
+
+                            if (orcamentoOP && clienteOP && op) {
+                                const itemOP = orcamentoOP.itens.find(item => item.produto === pedidoParaImprimir.produto) || orcamentoOP.itens[0]; // Simple fallback
+                                const papel = db.estoque.find(item => item.id === itemOP.papelId);
+                                const cor = db.cores.find(item => item.id === itemOP.corId);
+                                const acabamento = db.acabamentos.find(item => item.id === itemOP.acabamentoId);
+                                
+                                generateAndOpenOP({ pedido: pedidoParaImprimir, orcamento: orcamentoOP, item: itemOP, cliente: clienteOP, op, papel, cor, acabamento });
+                            } else {
+                                showNotification("Incomplete order data to generate PO.", false);
+                            }
+                        }
+                        break;
+                    case 'edit-client':
+                        const client = db.clientes.find(c => c.id == id);
+                        openGenericModal('Edit Client', `
+                            <form data-type="client" data-id="${client.id}">
+                                <div class="space-y-4">
+                                    <div><label class="block mb-1">Full Name</label><input name="nome" type="text" value="${client.nome}" class="w-full p-2 border rounded" required></div>
+                                    <div><label class="block mb-1">ID (CPF)</label><input name="cpf" type="text" value="${client.cpf}" class="w-full p-2 border rounded" required><div class="error-message"></div></div>
+                                    <div><label class="block mb-1">Phone</label><input name="telefone" type="text" value="${client.telefone}" class="w-full p-2 border rounded" required></div>
+                                    <div><label class="block mb-1">Email (Optional)</label><input name="email" type="email" value="${client.email || ''}" class="w-full p-2 border rounded"></div>
+                                    <div><label class="block mb-1">Company (Optional)</label><input name="empresa" type="text" value="${client.empresa || ''}" class="w-full p-2 border rounded"></div>
+                                </div>
+                                <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded">Update</button></div>
+                            </form>`);
+                        break;
+                    case 'add-stock-item':
+                    case 'edit-stock-item':
+                        const isEditing = action === 'edit-stock-item';
+                        const stockItem = isEditing ? db.estoque.find(i => i.id == id) : null;
+                        const categoriesOptions = db.categoriasEstoque.map(c => `<option value="${c.id}" ${stockItem && stockItem.categoriaId == c.id ? 'selected' : ''}>${c.nome}</option>`).join('');
+                        const suppliersOptions = db.fornecedores.map(f => `<option value="${f.id}" ${stockItem && stockItem.fornecedorId == f.id ? 'selected' : ''}>${f.nome}</option>`).join('');
+
+                        openGenericModal(isEditing ? 'Edit Stock Item' : 'Add Stock Item', `
+                            <form data-type="stock" ${isEditing ? `data-id="${stockItem.id}"` : ''}>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label class="block mb-1">Item Name</label><input name="item" type="text" value="${stockItem?.item || ''}" class="w-full p-2 border rounded" required></div>
+                                    <div><label class="block mb-1">Category</label><select name="categoriaId" class="w-full p-2 border rounded" required>${categoriesOptions}</select></div>
+                                    <div><label class="block mb-1">Unit</label><input name="unidade" type="text" placeholder="E.g.: Sheet, Liter" value="${stockItem?.unidade || ''}" class="w-full p-2 border rounded" required></div>
+                                    <div><label class="block mb-1">Supplier</label><select name="fornecedorId" class="w-full p-2 border rounded">${suppliersOptions}</select></div>
+                                    <div><label class="block mb-1">Cost Price</label><input name="precoCusto" type="number" step="0.01" value="${stockItem?.precoCusto || ''}" class="w-full p-2 border rounded" required></div>
+                                    <div><label class="block mb-1">Min. Quantity</label><input name="qtdMinima" type="number" value="${stockItem?.qtdMinima || ''}" class="w-full p-2 border rounded" required></div>
+                                    ${!isEditing ? `<div class="md:col-span-2"><label class="block mb-1">Initial Qty</label><input name="qtdAtual" type="number" class="w-full p-2 border rounded" required></div>` : ''}
+                                     <div><label class="block mb-1">Width (cm)</label><input name="widthCM" type="number" step="0.1" value="${stockItem?.widthCM || ''}" class="w-full p-2 border rounded"></div>
+                                     <div><label class="block mb-1">Height (cm)</label><input name="heightCM" type="number" step="0.1" value="${stockItem?.heightCM || ''}" class="w-full p-2 border rounded"></div>
+                                </div>
+                                <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded">${isEditing ? 'Update' : 'Add'}</button></div>
+                            </form>`);
+                        break;
+                    case 'manage-categories':
+                        const categoriesList = db.categoriasEstoque.map(c => `
+                            <div class="flex justify-between items-center p-2 border-b">
+                                <span>${c.nome}</span>
+                                <button data-action="delete-category" data-id="${c.id}" class="text-red-500 hover:text-red-700"><i class="fas fa-trash-alt"></i></button>
+                            </div>`).join('');
+                        openGenericModal('Manage Categories', `
+                            <div class="space-y-4">
+                                <div class="max-h-60 overflow-y-auto">${categoriesList || '<p class="text-center text-gray-500">No categories registered.</p>'}</div>
+                                <form data-type="category-add" class="mt-4 pt-4 border-t">
+                                    <label class="font-semibold">New Category</label>
+                                    <div class="flex mt-1">
+                                        <input name="categoryName" type="text" class="w-full p-2 border rounded-l" placeholder="Category Name" required>
+                                        <button type="submit" class="bg-blue-600 text-white px-4 rounded-r">Add</button>
+                                    </div>
+                                </form>
+                            </div>`);
+                        break;
+                    case 'delete-category':
+                        const categoryId = parseInt(id);
+                        if (db.estoque.some(item => item.categoriaId === categoryId)) {
+                            showNotification("Cannot delete. Category is in use by a stock item.", false);
+                        } else {
+                            db.categoriasEstoque = db.categoriasEstoque.filter(c => c.id !== categoryId);
+                            showNotification("Category deleted!");
+                            target.closest('.flex').parentElement.remove(); 
+                            renderTabelaEstoque(); 
+                        }
+                        break;
+                    case 'stock-entry':
+                    case 'stock-exit':
+                        const item = db.estoque.find(i => i.id == id);
+                        const isEntry = action === 'stock-entry';
+                        openGenericModal(`${isEntry ? 'Register Stock Entry' : 'Register Stock Exit'}`, `
+                            <form data-type="stock-update">
+                                <p class="mb-4">Item: <strong>${item.item}</strong> (Current: ${item.qtdAtual})</p>
+                                <input type="hidden" name="itemId" value="${item.id}">
+                                <input type="hidden" name="updateType" value="${isEntry ? 'entry' : 'exit'}">
+                                <div><label class="block mb-1">Quantity</label><input name="qty" type="number" class="w-full p-2 border rounded" required></div>
+                                <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded">Confirm</button></div>
+                            </form>`);
+                        break;
+                    case 'view-order':
+                        const p = db.pedidos.find(ped => ped.id == id);
+                        const c = db.clientes.find(cli => cli.id == p.clienteId);
+                        openGenericModal(`Order Details #${p.id}`, `
+                            <div class="space-y-3">
+                                <p><strong>Client:</strong> ${c.nome}</p>
+                                <p><strong>Product:</strong> ${p.produto}</p>
+                                <p><strong>Value:</strong> ${formatCurrency(p.valor)}</p>
+                                <p><strong>Order Date:</strong> ${new Date(p.data).toLocaleDateString()}</p>
+                                <p><strong>Current Status:</strong> ${p.status}</p>
+                            </div>`);
+                        break;
+                    case 'mark-as-paid':
+                        const type = target.dataset.type;
+                        const itemId = parseInt(id);
+                        const financialItem = db.financeiro[type].find(i => i.id === itemId);
+                        if (financialItem) {
+                            financialItem.pago = true;
+                            showNotification(`Entry marked as ${type === 'receber' ? 'received' : 'paid'}!`);
+
+                            if (financialItem.quoteId) {
+                                const quoteToApprove = db.orcamentos.find(o => o.id === financialItem.quoteId && o.status === 'Aguardando Pagamento');
+                                if (quoteToApprove) {
+                                    createOrderFromQuote(quoteToApprove);
+                                    const remainingValue = quoteToApprove.valor - financialItem.valor;
+                                    if (remainingValue > 0.01) {
+                                        const finalPayment = {
+                                            id: (db.financeiro.receber.length > 0 ? Math.max(...db.financeiro.receber.map(i => i.id)) : 0) + 1,
+                                            clienteId: quoteToApprove.clienteId, 
+                                            vencimento: quoteToApprove.entregaData || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0,10), 
+                                            valor: remainingValue, 
+                                            pago: false,
+                                            quoteId: quoteToApprove.id,
+                                            description: `Remaining for Quote #${quoteToApprove.id}`
+                                        };
+                                        db.financeiro.receber.push(finalPayment);
+                                    }
+                                }
+                            }
+                            renderAll();
+                        }
+                        break;
+                    case 'add-receivable':
+                        const clientsOptions = db.clientes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+                        openGenericModal('Add Account Receivable', `
+                            <form data-type="finance-entry" data-entry-type="receber">
+                                <div class="space-y-4">
+                                    <div><label class="block mb-1">Client</label><select name="clienteId" class="w-full p-2 border rounded">${clientsOptions}</select></div>
+                                    <div><label class="block mb-1">Value</label><input name="valor" type="number" step="0.01" class="w-full p-2 border rounded" required></div>
+                                    <div><label class="block mb-1">Due Date</label><input name="vencimento" type="date" class="w-full p-2 border rounded" required></div>
+                                </div>
+                                <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded">Save</button></div>
+                            </form>`);
+                        break;
+                    case 'add-payable':
+                        const supplierOptions = db.fornecedores.map(f => `<option value="${f.id}">${f.nome}</option>`).join('');
+                        openGenericModal('Add Account Payable', `
+                            <form data-type="finance-entry" data-entry-type="pagar">
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block mb-1">Supplier</label>
+                                        <select name="fornecedorId" class="w-full p-2 border rounded">${supplierOptions}</select>
+                                    </div>
+                                    <div><label class="block mb-1">Description (if no supplier)</label><input name="description" type="text" class="w-full p-2 border rounded"></div>
+                                    <div><label class="block mb-1">Value</label><input name="valor" type="number" step="0.01" class="w-full p-2 border rounded" required></div>
+                                    <div><label class="block mb-1">Due Date</label><input name="vencimento" type="date" class="w-full p-2 border rounded" required></div>
+                                </div>
+                                <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded">Save</button></div>
+                            </form>`);
+                        break;
+                    case 'add-standard-product':
+                    case 'edit-standard-product':
+                        const isEditingProduct = action === 'edit-standard-product';
+                        const product = isEditingProduct ? db.standardProducts.find(p => p.id == id) : null;
+                        openGenericModal(isEditingProduct ? 'Edit Standard Product' : 'New Standard Product', `
+                            <form data-type="standard-product" ${isEditingProduct ? `data-id="${product.id}"` : ''}>
+                                <div class="space-y-4">
+                                    <div><label class="block mb-1">Product Name</label><input name="name" type="text" value="${product?.name || ''}" class="w-full p-2 border rounded" required></div>
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div><label class="block mb-1">Width (cm)</label><input name="widthCM" type="number" step="0.1" value="${product?.widthCM || ''}" class="w-full p-2 border rounded" required></div>
+                                        <div><label class="block mb-1">Height (cm)</label><input name="heightCM" type="number" step="0.1" value="${product?.heightCM || ''}" class="w-full p-2 border rounded" required></div>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded">${isEditingProduct ? 'Update' : 'Save'}</button></div>
+                            </form>
+                        `);
+                        break;
+                    case 'delete-standard-product':
+                        db.standardProducts = db.standardProducts.filter(p => p.id != id);
+                        showNotification("Standard product deleted!");
+                        renderPrecificar();
+                        break;
+                    case 'add-color':
+                    case 'edit-color':
+                        const isEditingColor = action === 'edit-color';
+                        const color = isEditingColor ? db.cores.find(c => c.id == id) : null;
+                        openGenericModal(isEditingColor ? 'Edit Printing Cost' : 'Add Printing Cost', `
+                            <form data-type="pricing" data-pricing-type="cores" ${isEditingColor ? `data-id="${color.id}"` : ''}>
+                                <div class="space-y-4">
+                                    <div><label class="block mb-1">Description</label><input name="nome" type="text" value="${color?.nome || ''}" class="w-full p-2 border rounded" required></div>
+                                    <div><label class="block mb-1">Cost per Click</label><input name="custo" type="number" step="0.01" value="${color?.custoClique || ''}" class="w-full p-2 border rounded" required></div>
+                                    <div><label class="block mb-1">Printed Sides</label><input name="lados" type="number" min="1" max="2" value="${color?.lados || ''}" class="w-full p-2 border rounded" required></div>
+                                </div>
+                                <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded">${isEditingColor ? 'Update' : 'Add'}</button></div>
+                            </form>
+                        `);
+                        break;
+                    case 'delete-color':
+                        const colorId = parseInt(id);
+                        if(db.orcamentos.some(o => o.itens.some(i => i.corId === colorId))) {
+                            showNotification("Cannot delete. Cost is in use in a quote.", false);
+                        } else {
+                            db.cores = db.cores.filter(c => c.id !== colorId);
+                            showNotification("Printing cost deleted!");
+                            renderPrecificar();
+                        }
+                        break;
+                    case 'add-finishing':
+                    case 'edit-finishing':
+                        const isEditingFinishing = action === 'edit-finishing';
+                        const finishing = isEditingFinishing ? db.acabamentos.find(a => a.id == id) : null;
+                        openGenericModal(isEditingFinishing ? 'Edit Finishing Cost' : 'Add Finishing Cost', `
+                            <form data-type="pricing" data-pricing-type="acabamentos" ${isEditingFinishing ? `data-id="${finishing.id}"` : ''}>
+                                <div class="space-y-4">
+                                    <div><label class="block mb-1">Description</label><input name="nome" type="text" value="${finishing?.nome || ''}" class="w-full p-2 border rounded" required></div>
+                                    <div><label class="block mb-1">Cost per Thousand</label><input name="custo" type="number" step="0.01" value="${finishing?.custoPorMilheiro || ''}" class="w-full p-2 border rounded" required></div>
+                                </div>
+                                <div class="flex justify-end mt-6"><button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded">${isEditingFinishing ? 'Update' : 'Add'}</button></div>
+                            </form>
+                        `);
+                        break;
+                    case 'delete-finishing':
+                        const finishingId = parseInt(id);
+                        if(db.orcamentos.some(o => o.itens.some(i => i.acabamentoId === finishingId))) {
+                             showNotification("Cannot delete. Cost is in use in a quote.", false);
+                        } else {
+                            db.acabamentos = db.acabamentos.filter(a => a.id !== finishingId);
+                            showNotification("Finishing cost deleted!");
+                            renderPrecificar();
+                        }
+                        break;
+                }
+            }
+        });
+        
+        document.body.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.id === 'month-filter') {
+                selectedMonth = target.value;
+                renderFinanceiro();
+            } else if (target.classList.contains('status-pedido-select')) {
+                const pedidoId = target.dataset.id;
+                const newStatus = target.value;
+                const pedido = db.pedidos.find(p => p.id == pedidoId);
+                if (pedido) {
+                    pedido.status = newStatus;
+                    const op = db.producao.find(o => o.pedidoId == pedidoId);
+                    if (op) {
+                         switch (newStatus) {
+                            case 'In Production':
+                                op.setor = 'Printing';
+                                break;
+                            case 'Cutting': 
+                                op.setor = 'Cutting';
+                                break;
+                            case 'Finishing':
+                                op.setor = 'Finishing';
+                                break;
+                            case 'Ready':
+                                op.setor = 'Ready';
+                                break;
+                        }
+                    }
+                    showNotification(`Order status #${pedidoId} updated.`);
+                    renderAll();
+                }
+            }
+        });
+        
+        document.body.addEventListener('input', (e) => {
+            const target = e.target;
+            if(target.name === 'cpf') {
+                target.value = maskCPF(target.value);
+                const errorDiv = target.nextElementSibling;
+                if (target.value.length === 14) {
+                    if (validaCPF(target.value)) {
+                        target.classList.remove('input-error');
+                        errorDiv.textContent = '';
+                    } else {
+                        target.classList.add('input-error');
+                        errorDiv.textContent = 'Invalid CPF.';
+                    }
+                } else {
+                    target.classList.remove('input-error');
+                    errorDiv.textContent = '';
+                }
+            } else if (target.name === 'telefone') {
+                 target.value = maskPhone(target.value);
+            }
+        });
+
+        // Adiciona listener ao modal de orçamento de forma delegada para funcionar sempre
+        document.getElementById('modal-orcamento').addEventListener('input', (e) => {
+            if (e.target.closest('.item-row')) {
+                const row = e.target.closest('.item-row');
+                 if(e.target.name === 'produto-padrao') {
+                    const productId = e.target.value;
+                    const productNameInput = row.querySelector('[name="produto-nome"]');
+                    const widthInput = row.querySelector('[name="item-width"]');
+                    const heightInput = row.querySelector('[name="item-height"]');
+
+                    if(productId === 'custom'){
+                        productNameInput.value = '';
+                        widthInput.value = '';
+                        heightInput.value = '';
+                        widthInput.readOnly = false;
+                        heightInput.readOnly = false;
+                    } else {
+                        const product = db.standardProducts.find(p => p.id == productId);
+                        if(product) {
+                            productNameInput.value = product.name;
+                            widthInput.value = product.widthCM;
+                            heightInput.value = product.heightCM;
+                            widthInput.readOnly = true;
+                            heightInput.readOnly = true;
+                        }
+                    }
+                }
+                updateAllPrices();
+            }
+        });
+
+        // INICIALIZAÇÃO
+        renderAll();
+        switchView(window.location.hash || '#dashboard');
+    });
+    </script>
+</body>
+</html>
